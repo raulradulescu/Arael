@@ -49,3 +49,6 @@ tests/fixtures/hello_static
 
 ghidra-master/
 .claude/
+
+# mistakes
+nul
