@@ -259,6 +259,170 @@ export class GhidraConnection {
       return func?.pseudocode ?? null;
     }
   }
+
+  /**
+   * Disassemble a function or address range.
+   */
+  async disassemble(
+    binaryPath: string,
+    addressOrFunction: string,
+    length?: number,
+    includeBytes = true,
+    includeReferences = true
+  ): Promise<any[] | null> {
+    if (!this.isConnected()) {
+      await this.connect();
+    }
+
+    if (this.mode === 'bridge') {
+      // Bridge mode not yet implemented for disassembly
+      // Will need to be added to GhidraBridge
+      logger.warn('Disassembly via bridge not yet implemented, using headless');
+      return this.disassembleViaHeadless(
+        binaryPath,
+        addressOrFunction,
+        length,
+        includeBytes,
+        includeReferences
+      );
+    } else {
+      return this.disassembleViaHeadless(
+        binaryPath,
+        addressOrFunction,
+        length,
+        includeBytes,
+        includeReferences
+      );
+    }
+  }
+
+  /**
+   * Disassemble via headless mode (Python script).
+   */
+  private async disassembleViaHeadless(
+    binaryPath: string,
+    addressOrFunction: string,
+    length?: number,
+    includeBytes = true,
+    includeReferences = true
+  ): Promise<any[] | null> {
+    return this.headless.disassemble(
+      binaryPath,
+      addressOrFunction,
+      length,
+      includeBytes,
+      includeReferences
+    );
+  }
+
+  /**
+   * Get cross-references to/from an address.
+   */
+  async getXrefs(
+    binaryPath: string,
+    address: string,
+    direction: 'to' | 'from' | 'both' = 'both',
+    maxResults = 100
+  ): Promise<any[] | null> {
+    if (!this.isConnected()) {
+      await this.connect();
+    }
+
+    if (this.mode === 'bridge') {
+      logger.warn('Cross-references via bridge not yet implemented, using headless');
+      return this.getXrefsViaHeadless(binaryPath, address, direction, maxResults);
+    } else {
+      return this.getXrefsViaHeadless(binaryPath, address, direction, maxResults);
+    }
+  }
+
+  /**
+   * Get cross-references via headless mode (Python script).
+   */
+  private async getXrefsViaHeadless(
+    binaryPath: string,
+    address: string,
+    direction: 'to' | 'from' | 'both',
+    maxResults: number
+  ): Promise<any[] | null> {
+    return this.headless.getXrefs(binaryPath, address, direction, maxResults);
+  }
+
+  /**
+   * Get exported symbols from a binary.
+   */
+  async getExports(
+    binaryPath: string,
+    filter?: {
+      namePattern?: string;
+      type?: 'function' | 'data' | 'all';
+    }
+  ): Promise<any[] | null> {
+    if (!this.isConnected()) {
+      await this.connect();
+    }
+
+    if (this.mode === 'bridge') {
+      logger.warn('Exports via bridge not yet implemented, using headless');
+      return this.getExportsViaHeadless(binaryPath, filter);
+    } else {
+      return this.getExportsViaHeadless(binaryPath, filter);
+    }
+  }
+
+  /**
+   * Get exports via headless mode (Python script).
+   */
+  private async getExportsViaHeadless(
+    binaryPath: string,
+    filter?: {
+      namePattern?: string;
+      type?: 'function' | 'data' | 'all';
+    }
+  ): Promise<any[] | null> {
+    return this.headless.getExports(binaryPath, filter);
+  }
+
+  /**
+   * Generate a call graph for the binary.
+   */
+  async getCallgraph(
+    binaryPath: string,
+    options: {
+      format: 'json' | 'dot' | 'mermaid';
+      rootFunction?: string;
+      maxDepth?: number;
+      excludeExternal?: boolean;
+      includeThunks?: boolean;
+    }
+  ): Promise<any | null> {
+    if (!this.isConnected()) {
+      await this.connect();
+    }
+
+    if (this.mode === 'bridge') {
+      logger.warn('Call graph via bridge not yet implemented, using headless');
+      return this.getCallgraphViaHeadless(binaryPath, options);
+    } else {
+      return this.getCallgraphViaHeadless(binaryPath, options);
+    }
+  }
+
+  /**
+   * Get call graph via headless mode (Python script).
+   */
+  private async getCallgraphViaHeadless(
+    binaryPath: string,
+    options: {
+      format: 'json' | 'dot' | 'mermaid';
+      rootFunction?: string;
+      maxDepth?: number;
+      excludeExternal?: boolean;
+      includeThunks?: boolean;
+    }
+  ): Promise<any | null> {
+    return this.headless.getCallgraph(binaryPath, options);
+  }
 }
 
 // Singleton connection instance

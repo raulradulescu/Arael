@@ -11,6 +11,9 @@ import {
 } from './schema';
 import { generateFileHashes } from '../cache/keys';
 import { validateBinary } from '../utils/preflight';
+import { detectPacking } from '../utils/packing';
+import { analyzeSections } from '../utils/sections';
+import { categorizeImports } from '../utils/import-analysis';
 
 /**
  * Builder class for constructing AnalysisResult objects.
@@ -48,6 +51,25 @@ export class AnalysisBuilder {
       entryPoint: '0x0', // Will be set by Ghidra
       imageBase: '0x0' // Will be set by Ghidra
     };
+
+    // Automatically detect packing
+    try {
+      const packingInfo = await detectPacking(
+        preflight.absolutePath,
+        path.basename(filepath)
+      );
+      this.result.binary.packing = packingInfo;
+    } catch (e) {
+      // Packing detection is non-critical, continue without it
+    }
+
+    // Automatically analyze sections
+    try {
+      const sectionAnalysis = await analyzeSections(preflight.absolutePath);
+      this.result.sections = sectionAnalysis.sections;
+    } catch (e) {
+      // Section analysis is non-critical, continue without it
+    }
 
     return this;
   }
@@ -88,7 +110,27 @@ export class AnalysisBuilder {
    * Set imports from Ghidra analysis.
    */
   setImports(imports: ImportInfo[]): this {
-    this.result.imports = imports;
+    // Categorize imports automatically
+    const categorization = categorizeImports(imports);
+
+    // Merge categorization data back into imports
+    this.result.imports = imports.map((imp) => {
+      const categorized = categorization.categorizedImports.find(
+        (c) => c.name === imp.name && c.library === imp.library
+      );
+
+      if (categorized) {
+        return {
+          ...imp,
+          capabilities: categorized.capabilities,
+          riskLevel: categorized.riskLevel,
+          description: categorized.description
+        };
+      }
+
+      return imp;
+    });
+
     return this;
   }
 
@@ -140,6 +182,7 @@ export class AnalysisBuilder {
       version: '1.0.0',
       metadata,
       binary: this.result.binary,
+      sections: this.result.sections,
       functions: this.result.functions ?? [],
       strings: this.result.strings ?? [],
       imports: this.result.imports ?? []

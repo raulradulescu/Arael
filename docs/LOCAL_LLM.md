@@ -42,7 +42,7 @@ Workflow:
 2. Review functions and identify interesting targets
 3. Decompile suspicious functions
 4. Cross-reference strings and imports
-```
+`
 
 ### Full XML Prompt
 

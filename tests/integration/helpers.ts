@@ -1,6 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { GhidraHeadless } from '../../src/ghidra/headless';
+import { loadEnvFromFile } from '../../src/utils/env';
+
+// Load .env file FIRST before reading environment variables
+loadEnvFromFile();
 
 const ghidraPath = process.env['GHIDRA_PATH'];
 const bridgeConfigured = Boolean(

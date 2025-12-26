@@ -18,6 +18,31 @@ export interface BinaryHashes {
   sha256: string;
 }
 
+export interface PackerSignature {
+  name: string;
+  confidence: number;
+  version?: string;
+  canUnpack: boolean;
+  indicators: string[];
+}
+
+export interface SectionEntropy {
+  name: string;
+  entropy: number;
+}
+
+export interface PackingEntropy {
+  overall: number;
+  sections: SectionEntropy[];
+}
+
+export interface PackingInfo {
+  isPacked: boolean;
+  packers: PackerSignature[];
+  entropy?: PackingEntropy;
+  suspiciousIndicators: string[];
+}
+
 export interface BinaryInfo {
   filename: string;
   filepath: string;
@@ -28,6 +53,7 @@ export interface BinaryInfo {
   endianness: 'little' | 'big';
   entryPoint: string;
   imageBase: string;
+  packing?: PackingInfo;
 }
 
 export interface FunctionHexdump {
@@ -73,11 +99,48 @@ export interface StringInfo {
   xrefs: StringXref[];
 }
 
+export type ImportCapability =
+  | 'Network'
+  | 'Crypto'
+  | 'FileIO'
+  | 'Process'
+  | 'Registry'
+  | 'Memory'
+  | 'Threading'
+  | 'System'
+  | 'UI'
+  | 'AntiDebug'
+  | 'Injection'
+  | 'Persistence';
+
 export interface ImportInfo {
   name: string;
   library: string;
   address: string;
   type: 'function' | 'data';
+  capabilities?: ImportCapability[];
+  riskLevel?: 'low' | 'medium' | 'high' | 'critical';
+  description?: string;
+}
+
+export interface SectionAnomaly {
+  type: 'rwx' | 'high_entropy' | 'suspicious_name';
+  severity: 'low' | 'medium' | 'high';
+  description: string;
+}
+
+export interface SectionInfo {
+  name: string;
+  start: string;
+  end: string;
+  size: number;
+  permissions: {
+    read: boolean;
+    write: boolean;
+    execute: boolean;
+  };
+  entropy: number;
+  anomalies: SectionAnomaly[];
 }
 
 export interface ExportInfo {
@@ -97,6 +160,7 @@ export interface AnalysisResult {
   version: string;
   metadata: AnalysisMetadata;
   binary: BinaryInfo;
+  sections?: SectionInfo[];
   functions: FunctionInfo[];
   strings: StringInfo[];
   imports: ImportInfo[];

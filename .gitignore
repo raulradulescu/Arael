@@ -50,5 +50,9 @@ tests/fixtures/hello_static
 ghidra-master/
 .claude/
 
-# mistakes
+# Python compiled files
+*.pyc
+__pycache__/
+
+# Windows system file to avoid accidental commits of this file which can cause
 nul
