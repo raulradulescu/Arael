@@ -1,0 +1,242 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://arael.iseethereaper.com/schemas/analysis_output.schema.json",
+  "title": "Arael Analysis Output",
+  "description": "JSON schema for Arael binary analysis output",
+  "type": "object",
+  "required": ["version", "metadata", "binary", "functions", "strings", "imports"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference"
+    },
+    "version": {
+      "type": "string",
+      "description": "Arael output schema version",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "metadata": {
+      "$ref": "#/definitions/AnalysisMetadata"
+    },
+    "binary": {
+      "$ref": "#/definitions/BinaryInfo"
+    },
+    "functions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/FunctionInfo"
+      }
+    },
+    "strings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/StringInfo"
+      }
+    },
+    "imports": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ImportInfo"
+      }
+    },
+    "exports": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ExportInfo"
+      }
+    },
+    "agentAnalysis": {
+      "$ref": "#/definitions/AgentAnalysis"
+    }
+  },
+  "definitions": {
+    "AnalysisMetadata": {
+      "type": "object",
+      "required": ["analysisId", "timestamp", "araelVersion", "ghidraVersion", "analysisDurationMs", "connectionMode", "cached"],
+      "properties": {
+        "analysisId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "araelVersion": {
+          "type": "string"
+        },
+        "ghidraVersion": {
+          "type": "string"
+        },
+        "analysisDurationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "connectionMode": {
+          "type": "string",
+          "enum": ["bridge", "headless"]
+        },
+        "cached": {
+          "type": "boolean"
+        }
+      }
+    },
+    "BinaryInfo": {
+      "type": "object",
+      "required": ["filename", "filepath", "size", "hashes", "format", "architecture", "endianness", "entryPoint", "imageBase"],
+      "properties": {
+        "filename": {
+          "type": "string"
+        },
+        "filepath": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hashes": {
+          "type": "object",
+          "required": ["md5", "sha1", "sha256"],
+          "properties": {
+            "md5": { "type": "string" },
+            "sha1": { "type": "string" },
+            "sha256": { "type": "string" }
+          }
+        },
+        "format": {
+          "type": "string",
+          "enum": ["ELF", "PE", "Mach-O", "unknown"]
+        },
+        "architecture": {
+          "type": "string"
+        },
+        "endianness": {
+          "type": "string",
+          "enum": ["little", "big"]
+        },
+        "entryPoint": {
+          "type": "string"
+        },
+        "imageBase": {
+          "type": "string"
+        }
+      }
+    },
+    "FunctionInfo": {
+      "type": "object",
+      "required": ["name", "address", "size", "signature", "isThunk", "isExternal", "callers", "callees"],
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "size": { "type": "integer", "minimum": 0 },
+        "signature": { "type": "string" },
+        "isThunk": { "type": "boolean" },
+        "isExternal": { "type": "boolean" },
+        "callers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "callees": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "pseudocode": {
+          "type": ["string", "null"]
+        },
+        "decompileError": {
+          "type": "string"
+        },
+        "hexdump": {
+          "$ref": "#/definitions/FunctionHexdump"
+        },
+        "agentAnalysis": {
+          "$ref": "#/definitions/AgentFunctionAnalysis"
+        }
+      }
+    },
+    "FunctionHexdump": {
+      "type": "object",
+      "required": ["address", "bytes", "formatted"],
+      "properties": {
+        "address": { "type": "string" },
+        "bytes": { "type": "string" },
+        "formatted": { "type": "string" }
+      }
+    },
+    "AgentFunctionAnalysis": {
+      "type": "object",
+      "properties": {
+        "purpose": { "type": "string" },
+        "semanticName": { "type": "string" },
+        "securityNotes": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "StringInfo": {
+      "type": "object",
+      "required": ["address", "value", "length", "encoding", "xrefs"],
+      "properties": {
+        "address": { "type": "string" },
+        "value": { "type": "string" },
+        "length": { "type": "integer", "minimum": 0 },
+        "encoding": {
+          "type": "string",
+          "enum": ["ascii", "utf8", "utf16le", "utf16be"]
+        },
+        "section": { "type": "string" },
+        "xrefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/StringXref"
+          }
+        }
+      }
+    },
+    "StringXref": {
+      "type": "object",
+      "required": ["address", "function", "type"],
+      "properties": {
+        "address": { "type": "string" },
+        "function": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["data", "code"]
+        }
+      }
+    },
+    "ImportInfo": {
+      "type": "object",
+      "required": ["name", "library", "address", "type"],
+      "properties": {
+        "name": { "type": "string" },
+        "library": { "type": "string" },
+        "address": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["function", "data"]
+        }
+      }
+    },
+    "ExportInfo": {
+      "type": "object",
+      "required": ["name", "address"],
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "ordinal": { "type": "integer" }
+      }
+    },
+    "AgentAnalysis": {
+      "type": "object",
+      "properties": {
+        "summary": { "type": "string" },
+        "suspiciousIndicators": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

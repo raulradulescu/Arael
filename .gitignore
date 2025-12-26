@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Coverage
+coverage/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Arael specific
+.arael/
+*.gpr
+*.rep
+
+# Test binaries (compiled, not source)
+tests/fixtures/hello_world
+tests/fixtures/recursive_calls
+tests/fixtures/hello_stripped
+tests/fixtures/hello_static
+
+# Temporary files
+/tmp/
+*.tmp
+
+# SQLite
+*.sqlite
+*.sqlite3
+*.db
+
+ghidra-master/
+.claude/

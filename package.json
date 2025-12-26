@@ -1,0 +1,64 @@
+{
+  "name": "arael-re",
+  "version": "1.0.0",
+  "description": "Reverse engineering assistant bridging Ghidra with Claude Code via MCP",
+  "main": "dist/mcp/server.js",
+  "types": "dist/mcp/server.d.ts",
+  "bin": {
+    "arael": "./dist/cli/index.js",
+    "arael-mcp": "./dist/mcp/server.js",
+    "arael-start-ghidra": "./scripts/start-ghidra-bridge.sh",
+    "arael-check": "./dist/cli/check.js"
+  },
+  "scripts": {
+    "build": "tsc && npm run copy:scripts",
+    "copy:scripts": "node -e \"const fs=require('fs');const p=require('path');const src='src/ghidra/scripts';const dst='dist/ghidra/scripts';fs.mkdirSync(dst,{recursive:true});fs.readdirSync(src).forEach(f=>fs.copyFileSync(p.join(src,f),p.join(dst,f)));\"",
+    "build:watch": "tsc --watch",
+    "start": "node dist/mcp/server.js",
+    "start:dev": "ts-node src/mcp/server.ts",
+    "cli": "ts-node src/cli/index.ts",
+    "test": "jest",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration --runInBand",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:connection": "ts-node scripts/test-connection.ts",
+    "lint": "eslint src tests --ext .ts",
+    "lint:fix": "eslint src tests --ext .ts --fix",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "reverse-engineering",
+    "ghidra",
+    "mcp",
+    "claude",
+    "binary-analysis",
+    "decompiler",
+    "cybersecurity"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "better-sqlite3": "^11.0.0",
+    "commander": "^12.0.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.4.0"
+  }
+}
