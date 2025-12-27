@@ -63,32 +63,41 @@
 ## Suggested v2.3.0 Scope
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         v2.3.0 PROPOSED SCOPE                               │
+│                         v2.3.0 IMPLEMENTATION STATUS                        │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  MUST HAVE (Ship Blockers)                                                  │
-│  ├─ npm publish ready                                            [     ]   │
-│  ├─ arael_disassemble tool                                       [     ]   │
-│  ├─ arael_xrefs tool                                             [     ]   │
-│  ├─ arael_exports tool                                           [     ]   │
-│  ├─ UPX auto-unpacking                                           [     ]   │
-│  └─ PyInstaller extraction                                       [     ]   │
+│  ├─ npm publish ready                                            [⏸️ TODO] │
+│  ├─ arael_disassemble tool                                       [✅ DONE] │
+│  ├─ arael_xrefs tool                                             [✅ DONE] │
+│  ├─ arael_exports tool                                           [✅ DONE] │
+│  ├─ UPX auto-unpacking                                           [✅ DONE] │
+│  └─ PyInstaller extraction                                       [✅ DONE] │
 │                                                                             │
 │  SHOULD HAVE (High Value)                                                   │
-│  ├─ Packing detection (entropy + 10 packer signatures)           [     ]   │
-│  ├─ arael_callgraph tool                                         [     ]   │
-│  ├─ x86 (32-bit) architecture support                            [     ]   │
-│  ├─ Section analysis (permissions, entropy)                      [     ]   │
-│  └─ .pyc decompilation (uncompyle6/pycdc)                        [     ]   │
+│  ├─ Packing detection (entropy + 10 packer signatures)           [✅ DONE] │
+│  ├─ arael_callgraph tool                                         [✅ DONE] │
+│  ├─ x86 (32-bit) architecture support                     [📋 TESTS READY] │
+│  ├─ Section analysis (permissions, entropy)                      [✅ DONE] │
+│  └─ .pyc decompilation (uncompyle6/pycdc)                 [📋 TESTS READY] │
 │                                                                             │
 │  NICE TO HAVE (If Time)                                                     │
 │  ├─ Interactive shell mode                                       [     ]   │
 │  ├─ Batch analysis                                               [     ]   │
 │  ├─ YARA scanning with built-in rulesets                         [     ]   │
-│  └─ HTML report generation (CLI integration)                     [     ]   │
+│  ├─ HTML report generation (CLI integration)                     [     ]   │
+│  └─ x86 (16-bit) architecture support                     [📋 TESTS READY] │
 │                                                                             │
+│  Legend: ✅ DONE | 📋 TESTS READY (TDD) | ⏸️ TODO                           │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### TDD Test Suites Available
+| Feature | Test File | Lines | Status |
+|---------|-----------|-------|--------|
+| .pyc Decompilation | tests/unit/pyc-decompilation.test.ts | ~380 | Ready for implementation |
+| x86 32-bit Support | tests/integration/arch-x86-32bit.test.ts | ~330 | Ready for implementation |
+| x86 16-bit Support | tests/integration/arch-x86-16bit.test.ts | ~470 | Ready for implementation |
 
 ### Supported Packers (Detection)
 

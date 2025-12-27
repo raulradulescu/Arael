@@ -1902,17 +1902,42 @@ Phase 4 (v2.3.0) implementation progress (2025-12-26):
 - Updated output schema with new fields
 - All features automatically integrated into analysis pipeline
 
-Testing Status (2025-12-26):
+Testing Status (2025-12-27):
 - ✅ Project builds successfully with no errors
-- ✅ 11/16 test suites passing (all unit tests + basic integration tests)
-- ✅ 57/57 tests passing
-- ⏸️ 5 integration test suites require Python/pyghidra setup:
-  - disassemble.test.ts (needs pyghidra)
-  - xrefs.test.ts (needs pyghidra)
-  - callgraph.test.ts (needs pyghidra)
-  - packing.test.ts (needs pyghidra)
-  - analysis-enhancements.test.ts (needs pyghidra)
-- These will pass once Python environment is configured with: pip install pyghidra
+- ✅ 16/16 test suites passing
+- ✅ 131/131 tests passing
+- ✅ All integration tests working with pyghidra 3.0+ API
+
+TDD Test Suites for Future Features (2025-12-27):
+Created comprehensive test specifications for features to be implemented by other agents:
+
+1. tests/unit/pyc-decompilation.test.ts (~380 lines)
+   - PYC version detection (Python 2.7 through 3.13)
+   - Magic number parsing (timestamp, source size, hash-based)
+   - Decompilation via uncompyle6 (Python 2.7-3.8) and pycdc (all versions)
+   - Python feature handling: async/await, f-strings, walrus operator, match statements
+   - PyInstaller + PYC integration workflow
+   - Tool availability detection
+
+2. tests/integration/arch-x86-32bit.test.ts (~330 lines)
+   - ELF i386 analysis (Linux 32-bit)
+   - PE i386 analysis (Windows 32-bit)
+   - 32-bit register detection (EAX, EBX, ECX, EDX, ESI, EDI, EBP, ESP)
+   - Calling convention recognition (cdecl, stdcall, fastcall)
+   - 32-bit vs 64-bit comparison tests
+   - 32-bit stack frame analysis
+
+3. tests/integration/arch-x86-16bit.test.ts (~470 lines)
+   - DOS COM file analysis (entry at 0x100)
+   - DOS MZ EXE analysis (segmented memory)
+   - 16-bit register detection (AX, BX, CX, DX, SI, DI, BP, SP)
+   - Segment register handling (CS, DS, ES, SS)
+   - DOS INT 21h interrupt recognition
+   - Boot sector analysis (0x7C00 entry, 0xAA55 signature)
+   - 8086 vs 80286 feature detection
+   - Memory model documentation (Tiny, Small, Medium, Compact, Large, Huge)
+
+All TDD tests use `describe.skip` and will activate once implementations exist.
 -->
 
 ---
