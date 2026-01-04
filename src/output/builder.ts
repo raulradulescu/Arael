@@ -47,9 +47,11 @@ export class AnalysisBuilder {
       hashes,
       format: preflight.format,
       architecture: preflight.architecture ?? 'unknown',
+      machine: preflight.machine,
+      bits: preflight.bits,
       endianness: preflight.endianness ?? 'little',
-      entryPoint: '0x0', // Will be set by Ghidra
-      imageBase: '0x0' // Will be set by Ghidra
+      entryPoint: preflight.entryPoint ?? '0x0', // Will be set by Ghidra if available
+      imageBase: preflight.imageBase ?? '0x0' // Will be set by Ghidra if available
     };
 
     // Automatically detect packing
@@ -137,10 +139,14 @@ export class AnalysisBuilder {
   /**
    * Update entry point and image base from Ghidra.
    */
-  setAddresses(entryPoint: string, imageBase: string): this {
+  setAddresses(entryPoint?: string, imageBase?: string): this {
     if (this.result.binary) {
-      this.result.binary.entryPoint = entryPoint;
-      this.result.binary.imageBase = imageBase;
+      if (entryPoint) {
+        this.result.binary.entryPoint = entryPoint;
+      }
+      if (imageBase) {
+        this.result.binary.imageBase = imageBase;
+      }
     }
     return this;
   }
@@ -182,6 +188,8 @@ export class AnalysisBuilder {
       version: '1.0.0',
       metadata,
       binary: this.result.binary,
+      entryPoint: this.result.binary.entryPoint,
+      imageBase: this.result.binary.imageBase,
       sections: this.result.sections,
       functions: this.result.functions ?? [],
       strings: this.result.strings ?? [],

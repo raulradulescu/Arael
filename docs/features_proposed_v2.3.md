@@ -23,7 +23,7 @@
 | **UPX Auto-Unpack** | Detect + automatically unpack UPX binaries | Most common packer; `upx -d` is reliable |
 | **PyInstaller Extract** | Detect + extract Python bytecode from PyInstaller bundles | Common in malware & CTFs; use pyinstxtractor |
 | **Packing Detection** | Entropy analysis + packer signatures (UPX, Themida, ASPack, VMProtect, etc.) | Detection-only for unknown packers |
-| **.pyc Decompilation** | Decompile extracted .pyc to .py (via uncompyle6/pycdc) | Complete the PyInstaller analysis workflow |
+| **.pyc Decompilation** | Decompile extracted .pyc to .py (uncompyle6 + marshal/dis) | Complete the PyInstaller analysis workflow |
 
 ### Enhanced Analysis (P1)
 
@@ -79,7 +79,7 @@
 │  ├─ arael_callgraph tool                                         [✅ DONE] │
 │  ├─ x86 (32-bit) architecture support                     [📋 TESTS READY] │
 │  ├─ Section analysis (permissions, entropy)                      [✅ DONE] │
-│  └─ .pyc decompilation (uncompyle6/pycdc)                 [📋 TESTS READY] │
+│  └─ .pyc decompilation (uncompyle6 + marshal/dis)         [📋 TESTS READY] │
 │                                                                             │
 │  NICE TO HAVE (If Time)                                                     │
 │  ├─ Interactive shell mode                                       [     ]   │

@@ -18,15 +18,29 @@ except ImportError:
     sys.exit(1)
 
 
+def resolve_address(program, offset):
+    """Resolve an address, optionally treating offsets relative to image base."""
+    addr_factory = program.getAddressFactory()
+    address = addr_factory.getDefaultAddressSpace().getAddress(offset)
+    if os.environ.get('ARAEL_ADDRESS_MODE', '').lower() == 'offset':
+        try:
+            memory = program.getMemory()
+            if not memory.contains(address):
+                base_addr = program.getMinAddress()
+                address = base_addr.add(offset)
+        except Exception:
+            pass
+    return address
+
+
 def parse_address(program, address_str):
     """Parse address string to Ghidra Address object."""
-    addr_factory = program.getAddressFactory()
 
     # Try hex format
     if address_str.startswith('0x'):
         try:
             offset = int(address_str, 16)
-            return addr_factory.getDefaultAddressSpace().getAddress(offset)
+            return resolve_address(program, offset)
         except:
             pass
 
@@ -39,14 +53,14 @@ def parse_address(program, address_str):
     # Try hex without 0x prefix
     try:
         offset = int(address_str, 16)
-        return addr_factory.getDefaultAddressSpace().getAddress(offset)
+        return resolve_address(program, offset)
     except:
         pass
 
     # Try decimal
     try:
         offset = int(address_str, 10)
-        return addr_factory.getDefaultAddressSpace().getAddress(offset)
+        return resolve_address(program, offset)
     except:
         pass
 

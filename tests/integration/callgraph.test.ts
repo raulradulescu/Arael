@@ -70,7 +70,7 @@ describeOrSkip('arael_callgraph (integration)', () => {
 
       // Should have at least some nodes (functions)
       expect(result.nodes.length).toBeGreaterThan(0);
-    });
+    }, 120000);
 
     it('should include correct node format in JSON', async () => {
       if (!hasTestBinary()) {

@@ -209,6 +209,33 @@ export class GhidraConnection {
     // The headless result is already in the right format, just merge it
     const headlessData = result.result as any;
 
+    const normalizeAddr = (value: unknown): string | undefined => {
+      if (typeof value !== 'string') {
+        return undefined;
+      }
+      const trimmed = value.trim();
+      if (!trimmed || trimmed.toLowerCase() === 'unknown') {
+        return undefined;
+      }
+      return trimmed;
+    };
+
+    const entryPoint = normalizeAddr(headlessData.entryPoint);
+    const imageBase = normalizeAddr(headlessData.imageBase);
+
+    const isZeroAddress = (value?: string): boolean => {
+      if (!value) return false;
+      const normalized = value.toLowerCase();
+      return normalized === '0x0' || normalized === '0x00000000' || normalized === '0x0000000000000000';
+    };
+
+    if ((entryPoint && !isZeroAddress(entryPoint)) || imageBase) {
+      builder.setAddresses(
+        entryPoint && !isZeroAddress(entryPoint) ? entryPoint : undefined,
+        imageBase
+      );
+    }
+
     // Use functions from headless output (already have pseudocode)
     if (headlessData.functions) {
       builder.setFunctions(headlessData.functions);

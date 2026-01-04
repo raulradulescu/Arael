@@ -98,7 +98,7 @@
 | **UPX Auto-Unpack** | Detect + automatically unpack UPX binaries | Most common packer; `upx -d` is reliable |
 | **PyInstaller Extract** | Detect + extract Python bytecode from PyInstaller bundles | Common in malware & CTFs; use pyinstxtractor |
 | **Packing Detection** | Entropy analysis + packer signatures (UPX, Themida, ASPack, VMProtect, etc.) | Detection-only for unknown packers |
-| **.pyc Decompilation** | Decompile extracted .pyc to .py (via uncompyle6/pycdc) | Complete the PyInstaller analysis workflow |
+| **.pyc Decompilation** | Decompile extracted .pyc to .py (uncompyle6 + marshal/dis fallback) | Complete the PyInstaller analysis workflow |
 
 ### Enhanced Analysis (P1)
 
@@ -153,7 +153,7 @@
 │  ├─ arael_callgraph tool                                         [     ]   │
 │  ├─ x86 (32-bit) architecture support                            [     ]   │
 │  ├─ Section analysis (permissions, entropy)                      [     ]   │
-│  └─ .pyc decompilation (uncompyle6/pycdc)                        [     ]   │
+│  └─ .pyc decompilation (uncompyle6 + marshal/dis)                [     ]   │
 │                                                                             │
 │  NICE TO HAVE (If Time)                                                     │
 │  ├─ Interactive shell mode                                       [     ]   │
@@ -1914,7 +1914,7 @@ Created comprehensive test specifications for features to be implemented by othe
 1. tests/unit/pyc-decompilation.test.ts (~380 lines)
    - PYC version detection (Python 2.7 through 3.13)
    - Magic number parsing (timestamp, source size, hash-based)
-   - Decompilation via uncompyle6 (Python 2.7-3.8) and pycdc (all versions)
+   - Decompilation via uncompyle6 with marshal/dis/AST fallback
    - Python feature handling: async/await, f-strings, walrus operator, match statements
    - PyInstaller + PYC integration workflow
    - Tool availability detection
@@ -2306,7 +2306,7 @@ claude
 - [ ] Section analysis (entropy, permissions, anomalies)
 - [ ] Enhanced import categorization (Network, Crypto, File, Process, Registry)
 - [ ] x86 (32-bit) architecture support
-- [ ] .pyc decompilation (uncompyle6/pycdc)
+- [ ] .pyc decompilation (uncompyle6 + marshal/dis)
 
 **Success Gate**:
 ```bash

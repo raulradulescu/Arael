@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "tsc && npm run copy:scripts",
-    "copy:scripts": "node -e \"const fs=require('fs');const p=require('path');const src='src/ghidra/scripts';const dst='dist/ghidra/scripts';fs.mkdirSync(dst,{recursive:true});fs.readdirSync(src).forEach(f=>fs.copyFileSync(p.join(src,f),p.join(dst,f)));\"",
+    "copy:scripts": "node -e \"const fs=require('fs');const p=require('path');const src='src/ghidra/scripts';const dst='dist/ghidra/scripts';fs.mkdirSync(dst,{recursive:true});fs.readdirSync(src).forEach(f=>fs.copyFileSync(p.join(src,f),p.join(dst,f)));const extras=[{src:'src/utils/pyc_decompiler.py',dst:'dist/utils/pyc_decompiler.py'}];extras.forEach(({src,dst})=>{if(fs.existsSync(src)){fs.mkdirSync(p.dirname(dst),{recursive:true});fs.copyFileSync(src,dst);}});\"",
     "build:watch": "tsc --watch",
     "start": "node dist/mcp/server.js",
     "start:dev": "ts-node src/mcp/server.ts",

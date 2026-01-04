@@ -91,8 +91,10 @@ describeOrSkip('x86 32-bit Architecture Support', () => {
 
       const result = await functionsHandler({ filepath: elfPath });
 
-      expect(result.functions).toBeDefined();
-      const mainFunc = result.functions?.find(f => f.name === 'main');
+      // functionsHandler returns FunctionSummary[] directly
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+      const mainFunc = result.find(f => f.name === 'main');
       expect(mainFunc).toBeDefined();
     }, 120000);
 
@@ -104,10 +106,10 @@ describeOrSkip('x86 32-bit Architecture Support', () => {
         function: 'main'
       });
 
-      expect(result.code).toBeDefined();
-      expect(result.code).toContain('main');
+      expect(result.pseudocode).toBeDefined();
+      expect(result.pseudocode).toContain('main');
       // 32-bit code should not reference 64-bit registers
-      expect(result.code).not.toMatch(/\bRAX\b|\bRBX\b|\bRCX\b|\bRDX\b/);
+      expect(result.pseudocode).not.toMatch(/\bRAX\b|\bRBX\b|\bRCX\b|\bRDX\b/);
     }, 120000);
 
     it('should disassemble with 32-bit registers', async () => {
@@ -115,13 +117,13 @@ describeOrSkip('x86 32-bit Architecture Support', () => {
 
       const result = await disassembleHandler({
         filepath: elfPath,
-        target: 'main'
+        function: 'main'
       });
 
       expect(result.instructions).toBeDefined();
       if (result.instructions && result.instructions.length > 0) {
         // Should use 32-bit registers (EAX, EBX, etc.) not 64-bit (RAX, RBX)
-        const allAsm = result.instructions.map(i => i.mnemonic + ' ' + (i.operands || [])).join(' ');
+        const allAsm = result.instructions.map(i => i.mnemonic + ' ' + (i.operands || '')).join(' ');
 
         // Should have 32-bit register references
         expect(allAsm).toMatch(/E[ABCDSI]X|E[BS]P|E[DS]I/i);
@@ -205,7 +207,7 @@ describeOrSkip('x86 32-bit Architecture Support', () => {
         function: 'cdecl_func'
       });
 
-      expect(result.code).toBeDefined();
+      expect(result.pseudocode).toBeDefined();
       // cdecl: caller cleans stack, args pushed right-to-left
     }, 120000);
 
@@ -217,7 +219,7 @@ describeOrSkip('x86 32-bit Architecture Support', () => {
         function: 'stdcall_func'
       });
 
-      expect(result.code).toBeDefined();
+      expect(result.pseudocode).toBeDefined();
       // stdcall: callee cleans stack (RET n)
     }, 120000);
 
@@ -229,7 +231,7 @@ describeOrSkip('x86 32-bit Architecture Support', () => {
         function: 'fastcall_func'
       });
 
-      expect(result.code).toBeDefined();
+      expect(result.pseudocode).toBeDefined();
       // fastcall: first 2 args in ECX, EDX
     }, 120000);
   });
@@ -275,18 +277,13 @@ describeOrSkip('x86 32-bit Architecture Support', () => {
 
       const result = await disassembleHandler({
         filepath: complexPath,
-        target: 'main'
+        function: 'main'
       });
 
       expect(result.instructions).toBeDefined();
       if (result.instructions && result.instructions.length > 0) {
-        // Look for typical 32-bit prologue: PUSH EBP; MOV EBP,ESP
-        const first5 = result.instructions.slice(0, 5);
-        const hasPrologue = first5.some(i =>
-          i.mnemonic.toLowerCase() === 'push' &&
-          (i.operands?.join('') || '').toLowerCase().includes('ebp')
-        );
-        // May or may not have traditional prologue depending on optimization
+        // May or may not have traditional 32-bit prologue (PUSH EBP; MOV EBP,ESP)
+        // depending on compiler optimization
         expect(result.instructions.length).toBeGreaterThan(0);
       }
     }, 120000);

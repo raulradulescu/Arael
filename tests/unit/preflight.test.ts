@@ -27,13 +27,13 @@ describe('Preflight Checks', () => {
       }
     });
 
-    it('should reject non-ELF file', async () => {
+    it('should reject unsupported file formats', async () => {
       const textFile = path.join(tempDir, 'arael_test_text.txt');
       fs.writeFileSync(textFile, 'This is not a binary file');
 
       try {
         await expect(validateBinary(textFile))
-          .rejects.toThrow(/not an ELF/i);
+          .rejects.toThrow(/unsupported/i);
       } finally {
         fs.unlinkSync(textFile);
       }
@@ -87,7 +87,7 @@ describe('Preflight Checks', () => {
       }
     });
 
-    it('should reject non-x86_64 ELF binaries', async () => {
+    it('should accept 32-bit ELF binaries', async () => {
       const elfHeader = Buffer.alloc(64);
       elfHeader[0] = 0x7f;
       elfHeader[1] = 0x45;
@@ -101,8 +101,10 @@ describe('Preflight Checks', () => {
       fs.writeFileSync(elfFile, elfHeader);
 
       try {
-        await expect(validateBinary(elfFile))
-          .rejects.toThrow(/x86_64 only/i);
+        const result = await validateBinary(elfFile);
+        expect(result.format).toBe('ELF');
+        expect(result.architecture).toBe('i386');
+        expect(result.bits).toBe(32);
       } finally {
         fs.unlinkSync(elfFile);
       }

@@ -18,8 +18,14 @@ def extract_all():
     decomp.openProgram(currentProgram)
 
     # Get entry point
-    entry_symbol = currentProgram.getSymbolTable().getSymbol("entry")
-    entry_point = str(entry_symbol.getAddress()) if entry_symbol else "unknown"
+    entry_symbol = None
+    try:
+        for sym in currentProgram.getSymbolTable().getSymbols("entry"):
+            entry_symbol = sym
+            break
+    except Exception:
+        entry_symbol = None
+    entry_point = str(entry_symbol.getAddress()) if entry_symbol else str(currentProgram.getMinAddress())
 
     result = {
         "version": "1.0.0",

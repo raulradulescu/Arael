@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { logger } from '../utils/logger';
 import { AnalysisResult } from '../output/schema';
+import { validateBinary } from '../utils/preflight';
 
 export interface HeadlessResult {
   success: boolean;
@@ -50,6 +51,60 @@ export class GhidraHeadless {
     if (!fs.existsSync(this.projectPath)) {
       fs.mkdirSync(this.projectPath, { recursive: true });
     }
+  }
+
+  private async buildEnv(binaryPath: string): Promise<NodeJS.ProcessEnv> {
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      GHIDRA_PATH: this.ghidraPath,
+      JAVA_OPTIONS: this.javaOptions,
+      _JAVA_OPTIONS: this.javaOptions
+    };
+
+    try {
+      const preflight = await validateBinary(binaryPath);
+      const hints = this.getLoadHints(preflight);
+
+      if (!env['ARAEL_GHIDRA_LANGUAGE'] && hints.language) {
+        env['ARAEL_GHIDRA_LANGUAGE'] = hints.language;
+      }
+      if (!env['ARAEL_IMAGE_BASE'] && hints.imageBase) {
+        env['ARAEL_IMAGE_BASE'] = hints.imageBase;
+      }
+      if (!env['ARAEL_ADDRESS_MODE'] && hints.addressMode) {
+        env['ARAEL_ADDRESS_MODE'] = hints.addressMode;
+      }
+    } catch {
+      // Ignore preflight failures for environment hints
+    }
+
+    return env;
+  }
+
+  private getLoadHints(preflight: {
+    format: string;
+    entryPoint?: string;
+  }): {
+    language?: string;
+    imageBase?: string;
+    addressMode?: 'offset';
+  } {
+    if (preflight.format === 'COM') {
+      return {
+        language: 'x86:LE:16:Real Mode',
+        imageBase: preflight.entryPoint ?? '0x100'
+      };
+    }
+
+    if (preflight.format === 'RAW') {
+      return {
+        language: 'x86:LE:16:Real Mode',
+        imageBase: preflight.entryPoint ?? '0x7c00',
+        addressMode: 'offset'
+      };
+    }
+
+    return {};
   }
 
   /**
@@ -135,96 +190,95 @@ export class GhidraHeadless {
       const command = isWindows ? 'cmd.exe' : this.pythonPath;
       const commandArgs = isWindows ? ['/c', this.pythonPath, ...args] : args;
 
-      const proc = spawn(command, commandArgs, {
-        env: {
-          ...process.env,
-          GHIDRA_PATH: this.ghidraPath,
-          _JAVA_OPTIONS: this.javaOptions
-        }
-      });
+      const launch = async (): Promise<void> => {
+        const env = await this.buildEnv(absoluteBinaryPath);
+        const proc = spawn(command, commandArgs, { env });
 
-      let stderr = '';
-      let finished = false;
-      const finalize = (result: HeadlessResult): void => {
-        if (finished) {
-          return;
-        }
-        finished = true;
-        clearTimeout(timeoutHandle);
-        resolve(result);
-      };
+        let stderr = '';
+        let finished = false;
+        const finalize = (result: HeadlessResult): void => {
+          if (finished) {
+            return;
+          }
+          finished = true;
+          clearTimeout(timeoutHandle);
+          resolve(result);
+        };
 
-      const timeoutHandle = setTimeout(() => {
-        if (finished) {
-          return;
-        }
-        logger.error('Ghidra headless analysis timed out', { timeoutMs: this.timeout });
-        if (isWindows) {
-          proc.kill();
-        } else {
-          proc.kill('SIGKILL');
-        }
-        finalize({
-          success: false,
-          error: `Headless analysis timed out after ${this.timeout} ms`,
-          duration: Date.now() - startTime
-        });
-      }, this.timeout);
-
-      proc.stdout.on('data', (data: Buffer) => {
-        logger.debug(`PyGhidra: ${data.toString().trim()}`);
-      });
-
-      proc.stderr.on('data', (data: Buffer) => {
-        stderr += data.toString();
-      });
-
-      proc.on('close', (code) => {
-        if (finished) {
-          return;
-        }
-        const duration = Date.now() - startTime;
-
-        if (code !== 0 || !fs.existsSync(outputPath)) {
-          logger.error('Ghidra headless analysis failed', { code, stderr });
+        const timeoutHandle = setTimeout(() => {
+          if (finished) {
+            return;
+          }
+          logger.error('Ghidra headless analysis timed out', { timeoutMs: this.timeout });
+          if (isWindows) {
+            proc.kill();
+          } else {
+            proc.kill('SIGKILL');
+          }
           finalize({
             success: false,
-            error: `Headless analysis failed (code ${code}): ${stderr.slice(-500)}`,
-            duration
+            error: `Headless analysis timed out after ${this.timeout} ms`,
+            duration: Date.now() - startTime
           });
-        } else {
-          try {
-            const content = fs.readFileSync(outputPath, 'utf-8');
-            const result = JSON.parse(content) as AnalysisResult;
+        }, this.timeout);
 
-            // Clean up output file
-            fs.unlinkSync(outputPath);
+        proc.stdout.on('data', (data: Buffer) => {
+          logger.debug(`PyGhidra: ${data.toString().trim()}`);
+        });
 
-            logger.info('Ghidra headless analysis complete', { duration });
-            finalize({
-              success: true,
-              outputPath,
-              result,
-              duration
-            });
-          } catch (e) {
+        proc.stderr.on('data', (data: Buffer) => {
+          stderr += data.toString();
+        });
+
+        proc.on('close', (code) => {
+          if (finished) {
+            return;
+          }
+          const duration = Date.now() - startTime;
+
+          if (code !== 0 || !fs.existsSync(outputPath)) {
+            logger.error('Ghidra headless analysis failed', { code, stderr });
             finalize({
               success: false,
-              error: `Failed to parse analysis output: ${e}`,
+              error: `Headless analysis failed (code ${code}): ${stderr.slice(-500)}`,
               duration
             });
-          }
-        }
-      });
+          } else {
+            try {
+              const content = fs.readFileSync(outputPath, 'utf-8');
+              const result = JSON.parse(content) as AnalysisResult;
 
-      proc.on('error', (err) => {
-        logger.error('Failed to spawn Python process', { error: err.message });
-        finalize({
-          success: false,
-          error: `Failed to spawn Python: ${err.message}`,
-          duration: Date.now() - startTime
+              // Clean up output file
+              fs.unlinkSync(outputPath);
+
+              logger.info('Ghidra headless analysis complete', { duration });
+              finalize({
+                success: true,
+                outputPath,
+                result,
+                duration
+              });
+            } catch (e) {
+              finalize({
+                success: false,
+                error: `Failed to parse analysis output: ${e}`,
+                duration
+              });
+            }
+          }
         });
-      });
+
+        proc.on('error', (err) => {
+          logger.error('Failed to spawn Python process', { error: err.message });
+          finalize({
+            success: false,
+            error: `Failed to spawn Python: ${err.message}`,
+            duration: Date.now() - startTime
+          });
+        });
+      };
+
+      void launch();
     });
   }
 
@@ -268,67 +322,66 @@ export class GhidraHeadless {
         args.push('--no-references');
       }
 
-      const env = {
-        ...process.env,
-        GHIDRA_PATH: this.ghidraPath,
-        JAVA_OPTIONS: this.javaOptions
+      const launch = async (): Promise<void> => {
+        const env = await this.buildEnv(binaryPath);
+        const proc = spawn(this.pythonPath, args, {
+          env,
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+
+        let stdout = '';
+        let stderr = '';
+
+        proc.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+
+        proc.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        const timeout = setTimeout(() => {
+          proc.kill();
+          reject(new Error('Disassembly timeout'));
+        }, this.timeout);
+
+        proc.on('close', (code) => {
+          clearTimeout(timeout);
+
+          if (code !== 0) {
+            // Try to extract error from JSON stdout first
+            let errorMsg = stderr;
+            try {
+              const parsed = JSON.parse(stdout);
+              if (parsed.error) {
+                errorMsg = parsed.error;
+              }
+            } catch {
+              // Not JSON, use stderr or stdout as error
+              errorMsg = stderr || stdout;
+            }
+            logger.error('Disassembly failed', { code, stderr, stdout: stdout.slice(0, 500) });
+            reject(new Error(`Disassembly failed with code ${code}: ${errorMsg}`));
+            return;
+          }
+
+          try {
+            const result = JSON.parse(stdout);
+            resolve(result.instructions || null);
+          } catch (e) {
+            logger.error('Failed to parse disassembly output', { error: String(e) });
+            reject(new Error(`Failed to parse output: ${e}`));
+          }
+        });
+
+        proc.on('error', (err) => {
+          clearTimeout(timeout);
+          logger.error('Failed to spawn Python for disassembly', { error: err.message });
+          reject(new Error(`Failed to spawn Python: ${err.message}`));
+        });
       };
 
-      const proc = spawn(this.pythonPath, args, {
-        env,
-        stdio: ['ignore', 'pipe', 'pipe']
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      proc.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      proc.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      const timeout = setTimeout(() => {
-        proc.kill();
-        reject(new Error('Disassembly timeout'));
-      }, this.timeout);
-
-      proc.on('close', (code) => {
-        clearTimeout(timeout);
-
-        if (code !== 0) {
-          // Try to extract error from JSON stdout first
-          let errorMsg = stderr;
-          try {
-            const parsed = JSON.parse(stdout);
-            if (parsed.error) {
-              errorMsg = parsed.error;
-            }
-          } catch {
-            // Not JSON, use stderr or stdout as error
-            errorMsg = stderr || stdout;
-          }
-          logger.error('Disassembly failed', { code, stderr, stdout: stdout.slice(0, 500) });
-          reject(new Error(`Disassembly failed with code ${code}: ${errorMsg}`));
-          return;
-        }
-
-        try {
-          const result = JSON.parse(stdout);
-          resolve(result.instructions || null);
-        } catch (e) {
-          logger.error('Failed to parse disassembly output', { error: String(e) });
-          reject(new Error(`Failed to parse output: ${e}`));
-        }
-      });
-
-      proc.on('error', (err) => {
-        clearTimeout(timeout);
-        logger.error('Failed to spawn Python for disassembly', { error: err.message });
-        reject(new Error(`Failed to spawn Python: ${err.message}`));
-      });
+      void launch();
     });
   }
 
@@ -364,56 +417,55 @@ export class GhidraHeadless {
         '--max', maxResults.toString()
       ];
 
-      const env = {
-        ...process.env,
-        GHIDRA_PATH: this.ghidraPath,
-        JAVA_OPTIONS: this.javaOptions
+      const launch = async (): Promise<void> => {
+        const env = await this.buildEnv(binaryPath);
+        const proc = spawn(this.pythonPath, args, {
+          env,
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+
+        let stdout = '';
+        let stderr = '';
+
+        proc.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+
+        proc.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        const timeout = setTimeout(() => {
+          proc.kill();
+          reject(new Error('Cross-reference analysis timeout'));
+        }, this.timeout);
+
+        proc.on('close', (code) => {
+          clearTimeout(timeout);
+
+          if (code !== 0) {
+            logger.error('Cross-reference analysis failed', { code, stderr });
+            reject(new Error(`Cross-reference analysis failed with code ${code}: ${stderr}`));
+            return;
+          }
+
+          try {
+            const result = JSON.parse(stdout);
+            resolve(result.references || null);
+          } catch (e) {
+            logger.error('Failed to parse cross-reference output', { error: String(e) });
+            reject(new Error(`Failed to parse output: ${e}`));
+          }
+        });
+
+        proc.on('error', (err) => {
+          clearTimeout(timeout);
+          logger.error('Failed to spawn Python for cross-references', { error: err.message });
+          reject(new Error(`Failed to spawn Python: ${err.message}`));
+        });
       };
 
-      const proc = spawn(this.pythonPath, args, {
-        env,
-        stdio: ['ignore', 'pipe', 'pipe']
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      proc.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      proc.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      const timeout = setTimeout(() => {
-        proc.kill();
-        reject(new Error('Cross-reference analysis timeout'));
-      }, this.timeout);
-
-      proc.on('close', (code) => {
-        clearTimeout(timeout);
-
-        if (code !== 0) {
-          logger.error('Cross-reference analysis failed', { code, stderr });
-          reject(new Error(`Cross-reference analysis failed with code ${code}: ${stderr}`));
-          return;
-        }
-
-        try {
-          const result = JSON.parse(stdout);
-          resolve(result.references || null);
-        } catch (e) {
-          logger.error('Failed to parse cross-reference output', { error: String(e) });
-          reject(new Error(`Failed to parse output: ${e}`));
-        }
-      });
-
-      proc.on('error', (err) => {
-        clearTimeout(timeout);
-        logger.error('Failed to spawn Python for cross-references', { error: err.message });
-        reject(new Error(`Failed to spawn Python: ${err.message}`));
-      });
+      void launch();
     });
   }
 
@@ -449,56 +501,55 @@ export class GhidraHeadless {
         args.push('--type', filter.type);
       }
 
-      const env = {
-        ...process.env,
-        GHIDRA_PATH: this.ghidraPath,
-        JAVA_OPTIONS: this.javaOptions
+      const launch = async (): Promise<void> => {
+        const env = await this.buildEnv(binaryPath);
+        const proc = spawn(this.pythonPath, args, {
+          env,
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+
+        let stdout = '';
+        let stderr = '';
+
+        proc.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+
+        proc.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        const timeout = setTimeout(() => {
+          proc.kill();
+          reject(new Error('Exports extraction timeout'));
+        }, this.timeout);
+
+        proc.on('close', (code) => {
+          clearTimeout(timeout);
+
+          if (code !== 0) {
+            logger.error('Exports extraction failed', { code, stderr });
+            reject(new Error(`Exports extraction failed with code ${code}: ${stderr}`));
+            return;
+          }
+
+          try {
+            const result = JSON.parse(stdout);
+            resolve(result.exports || null);
+          } catch (e) {
+            logger.error('Failed to parse exports output', { error: String(e) });
+            reject(new Error(`Failed to parse output: ${e}`));
+          }
+        });
+
+        proc.on('error', (err) => {
+          clearTimeout(timeout);
+          logger.error('Failed to spawn Python for exports', { error: err.message });
+          reject(new Error(`Failed to spawn Python: ${err.message}`));
+        });
       };
 
-      const proc = spawn(this.pythonPath, args, {
-        env,
-        stdio: ['ignore', 'pipe', 'pipe']
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      proc.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      proc.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      const timeout = setTimeout(() => {
-        proc.kill();
-        reject(new Error('Exports extraction timeout'));
-      }, this.timeout);
-
-      proc.on('close', (code) => {
-        clearTimeout(timeout);
-
-        if (code !== 0) {
-          logger.error('Exports extraction failed', { code, stderr });
-          reject(new Error(`Exports extraction failed with code ${code}: ${stderr}`));
-          return;
-        }
-
-        try {
-          const result = JSON.parse(stdout);
-          resolve(result.exports || null);
-        } catch (e) {
-          logger.error('Failed to parse exports output', { error: String(e) });
-          reject(new Error(`Failed to parse output: ${e}`));
-        }
-      });
-
-      proc.on('error', (err) => {
-        clearTimeout(timeout);
-        logger.error('Failed to spawn Python for exports', { error: err.message });
-        reject(new Error(`Failed to spawn Python: ${err.message}`));
-      });
+      void launch();
     });
   }
 
@@ -547,56 +598,55 @@ export class GhidraHeadless {
         args.push('--include-thunks');
       }
 
-      const env = {
-        ...process.env,
-        GHIDRA_PATH: this.ghidraPath,
-        JAVA_OPTIONS: this.javaOptions
+      const launch = async (): Promise<void> => {
+        const env = await this.buildEnv(binaryPath);
+        const proc = spawn(this.pythonPath, args, {
+          env,
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+
+        let stdout = '';
+        let stderr = '';
+
+        proc.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+
+        proc.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        const timeout = setTimeout(() => {
+          proc.kill();
+          reject(new Error('Call graph generation timeout'));
+        }, this.timeout);
+
+        proc.on('close', (code) => {
+          clearTimeout(timeout);
+
+          if (code !== 0) {
+            logger.error('Call graph generation failed', { code, stderr });
+            reject(new Error(`Call graph generation failed with code ${code}: ${stderr}`));
+            return;
+          }
+
+          try {
+            const result = JSON.parse(stdout);
+            resolve(result);
+          } catch (e) {
+            logger.error('Failed to parse call graph output', { error: String(e) });
+            reject(new Error(`Failed to parse output: ${e}`));
+          }
+        });
+
+        proc.on('error', (err) => {
+          clearTimeout(timeout);
+          logger.error('Failed to spawn Python for call graph', { error: err.message });
+          reject(new Error(`Failed to spawn Python: ${err.message}`));
+        });
       };
 
-      const proc = spawn(this.pythonPath, args, {
-        env,
-        stdio: ['ignore', 'pipe', 'pipe']
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      proc.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      proc.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      const timeout = setTimeout(() => {
-        proc.kill();
-        reject(new Error('Call graph generation timeout'));
-      }, this.timeout);
-
-      proc.on('close', (code) => {
-        clearTimeout(timeout);
-
-        if (code !== 0) {
-          logger.error('Call graph generation failed', { code, stderr });
-          reject(new Error(`Call graph generation failed with code ${code}: ${stderr}`));
-          return;
-        }
-
-        try {
-          const result = JSON.parse(stdout);
-          resolve(result);
-        } catch (e) {
-          logger.error('Failed to parse call graph output', { error: String(e) });
-          reject(new Error(`Failed to parse output: ${e}`));
-        }
-      });
-
-      proc.on('error', (err) => {
-        clearTimeout(timeout);
-        logger.error('Failed to spawn Python for call graph', { error: err.message });
-        reject(new Error(`Failed to spawn Python: ${err.message}`));
-      });
+      void launch();
     });
   }
 }

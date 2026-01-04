@@ -79,7 +79,7 @@ describeOrSkip('arael_disassemble (integration)', () => {
 
     // Should have valid address format
     expect(firstInst.address).toMatch(/^0x[0-9a-fA-F]+$/);
-  });
+  }, 120000);
 
   it('should disassemble function by address', async () => {
     if (!hasTestBinary()) {

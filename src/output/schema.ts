@@ -48,8 +48,10 @@ export interface BinaryInfo {
   filepath: string;
   size: number;
   hashes: BinaryHashes;
-  format: 'ELF' | 'PE' | 'Mach-O' | 'unknown';
+  format: 'ELF' | 'PE' | 'MZ' | 'COM' | 'RAW' | 'Mach-O' | 'unknown';
   architecture: string;
+  machine?: string;
+  bits?: 16 | 32 | 64;
   endianness: 'little' | 'big';
   entryPoint: string;
   imageBase: string;
@@ -160,6 +162,8 @@ export interface AnalysisResult {
   version: string;
   metadata: AnalysisMetadata;
   binary: BinaryInfo;
+  entryPoint?: string;
+  imageBase?: string;
   sections?: SectionInfo[];
   functions: FunctionInfo[];
   strings: StringInfo[];

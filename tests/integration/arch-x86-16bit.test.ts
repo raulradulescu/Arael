@@ -30,9 +30,7 @@ loadEnvFromFile();
 
 import { getConnection } from '../../src/ghidra/connection';
 import { analyzeHandler } from '../../src/mcp/handlers/analyze';
-import { decompileHandler } from '../../src/mcp/handlers/decompile';
 import { disassembleHandler } from '../../src/mcp/handlers/disassemble';
-import { functionsHandler } from '../../src/mcp/handlers/functions';
 
 // Test fixtures directory
 const fixturesDir = path.join(__dirname, '../fixtures/x86_16');
@@ -106,14 +104,14 @@ describeOrSkip('x86 16-bit Architecture Support', () => {
 
       const result = await disassembleHandler({
         filepath: comPath,
-        target: '0x100',  // COM entry point
+        startAddress: '0x100',  // COM entry point
         length: 50
       });
 
       expect(result.instructions).toBeDefined();
       if (result.instructions && result.instructions.length > 0) {
         const allAsm = result.instructions.map(i =>
-          i.mnemonic + ' ' + (i.operands || []).join(',')
+          i.mnemonic + ' ' + (i.operands || '')
         ).join(' ');
 
         // Should use 16-bit registers (AX, BX, etc.)
@@ -134,7 +132,7 @@ describeOrSkip('x86 16-bit Architecture Support', () => {
 
       const result = await disassembleHandler({
         filepath: comPath,
-        target: '0x100',
+        startAddress: '0x100',
         length: 100
       });
 
@@ -143,7 +141,7 @@ describeOrSkip('x86 16-bit Architecture Support', () => {
         // DOS programs typically use INT 21h for system calls
         const hasInt21 = result.instructions.some(i =>
           i.mnemonic.toLowerCase() === 'int' &&
-          (i.operands?.join('') || '').includes('21')
+          (i.operands || '').includes('21')
         );
         // Most COM programs will have at least one INT 21h
         // (for printing, exiting, etc.)
@@ -208,7 +206,7 @@ describeOrSkip('x86 16-bit Architecture Support', () => {
 
       const result = await disassembleHandler({
         filepath: complexPath,
-        target: 'entry',
+        function: 'entry',
         length: 50
       });
 
@@ -221,19 +219,13 @@ describeOrSkip('x86 16-bit Architecture Support', () => {
 
       const result = await disassembleHandler({
         filepath: complexPath,
-        target: 'entry',
+        function: 'entry',
         length: 100
       });
 
       expect(result.instructions).toBeDefined();
       if (result.instructions && result.instructions.length > 0) {
-        // Look for DS: segment override or MOV DS,AX patterns
-        const allAsm = result.instructions.map(i =>
-          i.mnemonic + ' ' + (i.operands || []).join(',')
-        ).join(' ');
-
-        // May have segment registers
-        const hasSegRegs = /\b[CDEFS]S\b/i.test(allAsm);
+        // May have DS: segment override or MOV DS,AX patterns with segment registers
         expect(result.instructions.length).toBeGreaterThan(0);
       }
     }, 120000);
@@ -243,7 +235,7 @@ describeOrSkip('x86 16-bit Architecture Support', () => {
 
       const result = await disassembleHandler({
         filepath: complexPath,
-        target: 'entry',
+        function: 'entry',
         length: 200
       });
 
@@ -251,9 +243,6 @@ describeOrSkip('x86 16-bit Architecture Support', () => {
       if (result.instructions && result.instructions.length > 0) {
         // FAR calls: CALL FAR ptr or CALL segment:offset
         // NEAR calls: CALL offset
-        const hasCall = result.instructions.some(i =>
-          i.mnemonic.toLowerCase().includes('call')
-        );
         expect(result.instructions.length).toBeGreaterThan(0);
       }
     }, 120000);
@@ -281,7 +270,7 @@ describeOrSkip('x86 16-bit Architecture Support', () => {
       // Boot sectors are loaded at 0000:7C00 by BIOS
       const result = await disassembleHandler({
         filepath: bootPath,
-        target: '0x0',  // Start of file
+        startAddress: '0x0',  // Start of file
         length: 50
       });
 
@@ -311,7 +300,7 @@ describeOrSkip('x86 16-bit Architecture Support', () => {
 
       const result = await disassembleHandler({
         filepath: comPath,
-        target: '0x100',
+        startAddress: '0x100',
         length: 100
       });
 
@@ -332,7 +321,7 @@ describeOrSkip('x86 16-bit Architecture Support', () => {
 
       const result = await disassembleHandler({
         filepath: comPath,
-        target: '0x100',
+        startAddress: '0x100',
         length: 50
       });
 
@@ -341,12 +330,14 @@ describeOrSkip('x86 16-bit Architecture Support', () => {
         // Immediate values should be 16-bit max (0xFFFF)
         for (const inst of result.instructions) {
           if (inst.operands) {
-            for (const op of inst.operands) {
-              const match = op.match(/0x([0-9a-fA-F]+)/);
-              if (match && match[1]) {
+            // operands is a string like "AX, 0x1234"
+            const matches = inst.operands.match(/0x([0-9a-fA-F]+)/g);
+            if (matches) {
+              for (const m of matches) {
+                const hex = m.replace('0x', '');
                 // 16-bit immediate should be at most 4 hex chars
                 // (or 8 for segment:offset)
-                expect(match[1].length).toBeLessThanOrEqual(8);
+                expect(hex.length).toBeLessThanOrEqual(8);
               }
             }
           }
@@ -378,7 +369,7 @@ describeOrSkip('x86 16-bit Architecture Support', () => {
 
       const result = await disassembleHandler({
         filepath: path286,
-        target: 'entry',
+        function: 'entry',
         length: 100
       });
 

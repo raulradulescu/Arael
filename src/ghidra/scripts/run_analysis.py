@@ -10,6 +10,28 @@ import json
 import tempfile
 
 
+def parse_base_address(value):
+    if value is None:
+        return None
+    try:
+        text = str(value).strip()
+        if text.lower().startswith('0x'):
+            return int(text, 16)
+        return int(text, 10)
+    except Exception:
+        return None
+
+
+def apply_loader_option(loader, method_name, value):
+    if not hasattr(loader, method_name):
+        return loader
+    try:
+        result = getattr(loader, method_name)(value)
+        return result if result is not None else loader
+    except Exception:
+        return loader
+
+
 def main():
     if len(sys.argv) < 3:
         print("Usage: run_analysis.py <binary_path> <output_path>", file=sys.stderr)
@@ -50,10 +72,29 @@ def main():
             loader = loader.source(binary_file)
             loader = loader.project(project)
 
+            language_id = os.environ.get('ARAEL_GHIDRA_LANGUAGE')
+            if language_id:
+                try:
+                    from ghidra.program.model.lang import LanguageID
+                    language_id = LanguageID(language_id)
+                except Exception:
+                    pass
+                loader = apply_loader_option(loader, 'language', language_id)
+                loader = apply_loader_option(loader, 'set_language', language_id)
+
             with loader.load() as load_results:
                 # Get the primary loaded program
                 loaded = load_results.getPrimary()
                 program = loaded.getDomainObject()
+                image_base = parse_base_address(os.environ.get('ARAEL_IMAGE_BASE'))
+                if image_base is not None:
+                    try:
+                        addr_space = program.getAddressFactory().getDefaultAddressSpace()
+                        base_addr = addr_space.getAddress(image_base)
+                        if program.getImageBase().getOffset() != image_base:
+                            program.setImageBase(base_addr, True)
+                    except Exception:
+                        pass
 
                 # Run analysis
                 pyghidra.analyze(program)
@@ -79,12 +120,24 @@ def extract_analysis(program, monitor):
     """Extract all analysis data from the program."""
     from ghidra.app.decompiler import DecompInterface
 
+    symbol_table = program.getSymbolTable()
+    entry_symbol = None
+    try:
+        for sym in symbol_table.getSymbols("entry"):
+            entry_symbol = sym
+            break
+    except Exception:
+        entry_symbol = None
+    entry_point = str(entry_symbol.getAddress()) if entry_symbol else str(program.getMinAddress())
+
     result = {
         'filename': program.getName(),
         'format': program.getExecutableFormat(),
         'architecture': str(program.getLanguage().getProcessor()),
         'addressSize': program.getAddressFactory().getDefaultAddressSpace().getSize(),
         'compiler': str(program.getCompiler()) if program.getCompiler() else None,
+        'entryPoint': entry_point,
+        'imageBase': str(program.getImageBase()),
         'functions': [],
         'strings': [],
         'imports': [],
@@ -154,7 +207,6 @@ def extract_analysis(program, monitor):
             })
 
     # Extract exports
-    symbol_table = program.getSymbolTable()
     for sym in symbol_table.getAllSymbols(True):
         if sym.isExternalEntryPoint():
             result['exports'].append({

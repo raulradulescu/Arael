@@ -2,15 +2,20 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const ELF_MAGIC = Buffer.from([0x7f, 0x45, 0x4c, 0x46]); // \x7fELF
+const MZ_MAGIC = Buffer.from([0x4d, 0x5a]); // MZ
 
 export interface PreflightResult {
   valid: boolean;
   filepath: string;
   absolutePath: string;
   size: number;
-  format: 'ELF' | 'unknown';
+  format: 'ELF' | 'PE' | 'MZ' | 'COM' | 'RAW' | 'unknown';
   architecture?: string;
+  machine?: string;
+  bits?: 16 | 32 | 64;
   endianness?: 'little' | 'big';
+  entryPoint?: string;
+  imageBase?: string;
 }
 
 export class PreflightError extends Error {
@@ -25,7 +30,6 @@ export class PreflightError extends Error {
 
 /**
  * Validates that a file exists, is readable, and is a supported binary format.
- * For v1.0, only ELF x86_64 binaries are supported.
  */
 export async function validateBinary(filepath: string): Promise<PreflightResult> {
   const absolutePath = path.resolve(filepath);
@@ -57,54 +61,58 @@ export async function validateBinary(filepath: string): Promise<PreflightResult>
     );
   }
 
-  // Read magic bytes
+  // Read header bytes
   const fd = fs.openSync(absolutePath, 'r');
-  const header = Buffer.alloc(64); // ELF header is 64 bytes for ELF64
+  const header = Buffer.alloc(512);
   fs.readSync(fd, header, 0, header.length, 0);
   fs.closeSync(fd);
 
-  // Check ELF magic
-  if (!header.subarray(0, 4).equals(ELF_MAGIC)) {
-    throw new PreflightError(
-      `Not an ELF binary (unsupported format in v1.0): ${absolutePath}`,
-      'UNSUPPORTED_FORMAT'
-    );
+  const ext = path.extname(absolutePath).toLowerCase();
+
+  if (header.subarray(0, 4).equals(ELF_MAGIC)) {
+    return parseElf(filepath, absolutePath, stats.size, header);
   }
 
-  // Detect architecture from ELF header
-  // Byte 4: EI_CLASS (1 = 32-bit, 2 = 64-bit)
-  // Byte 5: EI_DATA (1 = little endian, 2 = big endian)
-  const is64Bit = header[4] === 2;
-  const isLittleEndian = header[5] === 1;
-  const isBigEndian = header[5] === 2;
-
-  const endianness = isLittleEndian ? 'little' : isBigEndian ? 'big' : undefined;
-  if (!endianness) {
-    throw new PreflightError(
-      `Unknown ELF endianness: ${absolutePath}`,
-      'UNSUPPORTED_FORMAT'
-    );
+  if (header.subarray(0, 2).equals(MZ_MAGIC)) {
+    return parseMzOrPe(filepath, absolutePath, stats.size, header);
   }
 
-  const eMachine = header.readUInt16LE(18);
-  const isX86_64 = eMachine === 0x3e;
-
-  if (!is64Bit || !isLittleEndian || !isX86_64) {
-    throw new PreflightError(
-      `Unsupported ELF architecture (v1.0 supports x86_64 only): ${absolutePath}`,
-      'UNSUPPORTED_FORMAT'
-    );
+  if (ext === '.com') {
+    return {
+      valid: true,
+      filepath,
+      absolutePath,
+      size: stats.size,
+      format: 'COM',
+      architecture: '8086',
+      machine: '8086',
+      bits: 16,
+      endianness: 'little',
+      entryPoint: '0x100',
+      imageBase: '0x0'
+    };
   }
 
-  return {
-    valid: true,
-    filepath,
-    absolutePath,
-    size: stats.size,
-    format: 'ELF',
-    architecture: 'x86_64',
-    endianness
-  };
+  if (ext === '.bin' && header.length >= 512 && header[510] === 0x55 && header[511] === 0xaa) {
+    return {
+      valid: true,
+      filepath,
+      absolutePath,
+      size: stats.size,
+      format: 'RAW',
+      architecture: '8086',
+      machine: '8086',
+      bits: 16,
+      endianness: 'little',
+      entryPoint: '0x7c00',
+      imageBase: '0x0'
+    };
+  }
+
+  throw new PreflightError(
+    `Unsupported binary format: ${absolutePath}`,
+    'UNSUPPORTED_FORMAT'
+  );
 }
 
 /**
@@ -123,5 +131,149 @@ export function isElfBinary(filepath: string): boolean {
     return magic.equals(ELF_MAGIC);
   } catch {
     return false;
+  }
+}
+
+function parseElf(
+  filepath: string,
+  absolutePath: string,
+  size: number,
+  header: Buffer
+): PreflightResult {
+  const is64Bit = header[4] === 2;
+  const isLittleEndian = header[5] === 1;
+  const isBigEndian = header[5] === 2;
+
+  const endianness = isLittleEndian ? 'little' : isBigEndian ? 'big' : undefined;
+  if (!endianness) {
+    throw new PreflightError(
+      `Unknown ELF endianness: ${absolutePath}`,
+      'UNSUPPORTED_FORMAT'
+    );
+  }
+
+  const eMachine = isLittleEndian ? header.readUInt16LE(18) : header.readUInt16BE(18);
+  const machine = machineFromElf(eMachine);
+  const bits = is64Bit ? 64 : 32;
+
+  return {
+    valid: true,
+    filepath,
+    absolutePath,
+    size,
+    format: 'ELF',
+    architecture: machine,
+    machine,
+    bits,
+    endianness
+  };
+}
+
+function parseMzOrPe(
+  filepath: string,
+  absolutePath: string,
+  size: number,
+  header: Buffer
+): PreflightResult {
+  const e_lfanew = header.readUInt32LE(0x3c);
+  let peHeader: Buffer | null = null;
+
+  if (e_lfanew > 0) {
+    if (e_lfanew + 4 <= header.length) {
+      peHeader = header.subarray(e_lfanew);
+    } else {
+      try {
+        const fd = fs.openSync(absolutePath, 'r');
+        const buffer = Buffer.alloc(256);
+        const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, e_lfanew);
+        fs.closeSync(fd);
+        if (bytesRead >= 4) {
+          peHeader = buffer.subarray(0, bytesRead);
+        }
+      } catch {
+        peHeader = null;
+      }
+    }
+  }
+
+  const hasPeHeader =
+    !!peHeader &&
+    peHeader.length >= 4 &&
+    peHeader.readUInt32LE(0) === 0x00004550;
+
+  if (!hasPeHeader) {
+    const ip = header.readUInt16LE(0x14);
+    const cs = header.readUInt16LE(0x16);
+    const entry = (cs << 4) + ip;
+
+    return {
+      valid: true,
+      filepath,
+      absolutePath,
+      size,
+      format: 'MZ',
+      architecture: '8086',
+      machine: '8086',
+      bits: 16,
+      endianness: 'little',
+      entryPoint: `0x${entry.toString(16)}`,
+      imageBase: '0x0'
+    };
+  }
+
+  const machine = peHeader!.readUInt16LE(4);
+  const optionalHeaderOffset = 24;
+  if (peHeader!.length < optionalHeaderOffset + 28) {
+    throw new PreflightError(
+      `Unsupported PE header size: ${absolutePath}`,
+      'UNSUPPORTED_FORMAT'
+    );
+  }
+
+  const magic = peHeader!.readUInt16LE(optionalHeaderOffset);
+  const bits = magic === 0x20b ? 64 : 32;
+  const addressOfEntryPoint = peHeader!.readUInt32LE(optionalHeaderOffset + 16);
+  const imageBase = magic === 0x20b
+    ? Number(peHeader!.readBigUInt64LE(optionalHeaderOffset + 24))
+    : peHeader!.readUInt32LE(optionalHeaderOffset + 28);
+
+  return {
+    valid: true,
+    filepath,
+    absolutePath,
+    size,
+    format: 'PE',
+    architecture: machineFromPe(machine),
+    machine: machineFromPe(machine),
+    bits,
+    endianness: 'little',
+    entryPoint: `0x${addressOfEntryPoint.toString(16)}`,
+    imageBase: `0x${imageBase.toString(16)}`
+  };
+}
+
+function machineFromElf(machine: number): string {
+  switch (machine) {
+    case 0x03:
+      return 'i386';
+    case 0x3e:
+      return 'x86_64';
+    case 0x28:
+      return 'arm';
+    case 0xb7:
+      return 'aarch64';
+    default:
+      return `unknown(0x${machine.toString(16)})`;
+  }
+}
+
+function machineFromPe(machine: number): string {
+  switch (machine) {
+    case 0x14c:
+      return 'i386';
+    case 0x8664:
+      return 'x86_64';
+    default:
+      return `unknown(0x${machine.toString(16)})`;
   }
 }

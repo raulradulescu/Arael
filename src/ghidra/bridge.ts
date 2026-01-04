@@ -281,7 +281,7 @@ else:
     "language": str(currentProgram.getLanguage()),
     "format": currentProgram.getExecutableFormat(),
     "imageBase": str(currentProgram.getImageBase()),
-    "entryPoint": str(currentProgram.getSymbolTable().getSymbol("entry").getAddress()) if currentProgram.getSymbolTable().getSymbol("entry") else "unknown"
+    "entryPoint": (lambda symbols: str(symbols[0].getAddress()) if symbols else str(currentProgram.getMinAddress()))([s for s in currentProgram.getSymbolTable().getSymbols("entry")])
 }
     `);
   }

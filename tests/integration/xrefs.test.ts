@@ -96,7 +96,7 @@ describeOrSkip('arael_xrefs (integration)', () => {
       expect(ref.from).toMatch(/^0x[0-9a-fA-F]+$/);
       expect(ref.type).toMatch(/^(call|jump|data|read|write)$/i);
     }
-  });
+  }, 120000);
 
   it('should find references FROM an address (what does this call)', async () => {
     if (!hasTestBinary()) {

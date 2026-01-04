@@ -21,6 +21,14 @@
     "binary": {
       "$ref": "#/definitions/BinaryInfo"
     },
+    "entryPoint": {
+      "type": "string",
+      "description": "Entry point alias for convenience"
+    },
+    "imageBase": {
+      "type": "string",
+      "description": "Image base alias for convenience"
+    },
     "functions": {
       "type": "array",
       "items": {
@@ -106,10 +114,17 @@
         },
         "format": {
           "type": "string",
-          "enum": ["ELF", "PE", "Mach-O", "unknown"]
+          "enum": ["ELF", "PE", "MZ", "COM", "RAW", "Mach-O", "unknown"]
         },
         "architecture": {
           "type": "string"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "bits": {
+          "type": "integer",
+          "enum": [16, 32, 64]
         },
         "endianness": {
           "type": "string",

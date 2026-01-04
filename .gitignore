@@ -47,12 +47,25 @@ tests/fixtures/hello_static
 *.sqlite3
 *.db
 
+# Ghidra
 ghidra-master/
+
+
 .claude/
 
 # Python compiled files
 *.pyc
 __pycache__/
 
-# Windows system file to avoid accidental commits of this file which can cause
+# Windows system file to avoid accidental commits of this file which can cause problems on other systems
+Thumbs.db
 nul
+
+
+# macOS system file to avoid accidental commits of this file which can cause problems on other systems
+.DS_Store
+
+# Test folders
+hxp-ctf/
+P1K4Z80/
+sharing/
