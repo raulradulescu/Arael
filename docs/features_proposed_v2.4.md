@@ -1,8 +1,8 @@
-## Arael v2.3.0 - Proposed Features
+## Arael v2.4.0 - Feature Status
 
-### Immediate Priorities (Complete Phase 3)
+### Immediate Priorities
 ```
-□ Comprehensive error messages with troubleshooting hints
+✅ Comprehensive error messages with troubleshooting hints
 □ npm package configuration & publishing to npmjs.com
 □ Claude Code MCP integration testing (real /arael command)
 ```
@@ -60,44 +60,49 @@
 
 ---
 
-## Suggested v2.3.0 Scope
+## v2.4.0 Implementation Status
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         v2.3.0 IMPLEMENTATION STATUS                        │
+│                         v2.4.0 IMPLEMENTATION STATUS                        │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  MUST HAVE (Ship Blockers)                                                  │
-│  ├─ npm publish ready                                            [⏸️ TODO] │
+│  COMPLETED (v2.3.0)                                                         │
 │  ├─ arael_disassemble tool                                       [✅ DONE] │
 │  ├─ arael_xrefs tool                                             [✅ DONE] │
 │  ├─ arael_exports tool                                           [✅ DONE] │
-│  ├─ UPX auto-unpacking                                           [✅ DONE] │
-│  └─ PyInstaller extraction                                       [✅ DONE] │
-│                                                                             │
-│  SHOULD HAVE (High Value)                                                   │
-│  ├─ Packing detection (entropy + 10 packer signatures)           [✅ DONE] │
 │  ├─ arael_callgraph tool                                         [✅ DONE] │
-│  ├─ x86 (32-bit) architecture support                     [📋 TESTS READY] │
-│  ├─ Section analysis (permissions, entropy)                      [✅ DONE] │
-│  └─ .pyc decompilation (uncompyle6 + marshal/dis)         [📋 TESTS READY] │
+│  ├─ UPX auto-unpacking                                           [✅ DONE] │
+│  ├─ PyInstaller extraction                                       [✅ DONE] │
+│  ├─ Packing detection (entropy + 10 packer signatures)           [✅ DONE] │
+│  └─ Section analysis (permissions, entropy)                      [✅ DONE] │
 │                                                                             │
-│  NICE TO HAVE (If Time)                                                     │
+│  COMPLETED (v2.4.0 - NEW)                                                   │
+│  ├─ x86 32-bit architecture support                              [✅ DONE] │
+│  ├─ x86 16-bit architecture support (DOS/real mode)              [✅ DONE] │
+│  ├─ .pyc decompilation (pycdc + uncompyle6 + marshal/dis)        [✅ DONE] │
+│  └─ Multi-decompiler fallback chain                              [✅ DONE] │
+│                                                                             │
+│  TODO (Ship Blockers)                                                       │
+│  └─ npm publish ready                                            [⏸️ TODO] │
+│                                                                             │
+│  FUTURE (v2.5.0+)                                                           │
 │  ├─ Interactive shell mode                                       [     ]   │
 │  ├─ Batch analysis                                               [     ]   │
 │  ├─ YARA scanning with built-in rulesets                         [     ]   │
 │  ├─ HTML report generation (CLI integration)                     [     ]   │
-│  └─ x86 (16-bit) architecture support                     [📋 TESTS READY] │
+│  ├─ ARM64 architecture support                                   [     ]   │
+│  └─ ARM32 architecture support                                   [     ]   │
 │                                                                             │
-│  Legend: ✅ DONE | 📋 TESTS READY (TDD) | ⏸️ TODO                           │
+│  Legend: ✅ DONE | ⏸️ TODO                                                  │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### TDD Test Suites Available
-| Feature | Test File | Lines | Status |
-|---------|-----------|-------|--------|
-| .pyc Decompilation | tests/unit/pyc-decompilation.test.ts | ~380 | Ready for implementation |
-| x86 32-bit Support | tests/integration/arch-x86-32bit.test.ts | ~330 | Ready for implementation |
-| x86 16-bit Support | tests/integration/arch-x86-16bit.test.ts | ~470 | Ready for implementation |
+### Test Suites
+| Feature | Test File | Status |
+|---------|-----------|--------|
+| .pyc Decompilation | tests/unit/pyc-decompilation.test.ts | ✅ Implemented |
+| x86 32-bit Support | tests/integration/arch-x86-32bit.test.ts | ✅ Implemented |
+| x86 16-bit Support | tests/integration/arch-x86-16bit.test.ts | ✅ Implemented |
 
 ### Supported Packers (Detection)
 

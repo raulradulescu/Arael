@@ -7,6 +7,9 @@ dist/
 # Coverage
 coverage/
 
+# Virtual environments
+.venv/
+
 # IDE
 .idea/
 .vscode/
@@ -51,7 +54,7 @@ tests/fixtures/hello_static
 ghidra-master/
 
 
-.claude/
+.claude/settings.local.json
 
 # Python compiled files
 *.pyc
