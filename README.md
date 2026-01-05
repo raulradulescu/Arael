@@ -2,10 +2,9 @@
 
 **Reverse Engineering Assistant for Cybersecurity Professionals**
 
-[![Tests](https://img.shields.io/badge/tests-47%2F47%20passing-brightgreen)]()
-[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)]()
 [![Ghidra](https://img.shields.io/badge/Ghidra-12.0-blue)]()
-[![Python](https://img.shields.io/badge/Python-3.13-blue)]()
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)]()
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue)]()
 
 Arael is an MCP (Model Context Protocol) server that bridges Ghidra's powerful binary analysis capabilities with Claude Code. It enables AI-assisted reverse engineering by exposing decompilation, disassembly, and binary analysis through structured JSON APIs.
@@ -15,61 +14,42 @@ Arael is an MCP (Model Context Protocol) server that bridges Ghidra's powerful b
 
 ---
 
-## 🎯 **What's New in v2.2.1**
+## ✨ **What's New in v2.4**
 
-**🔥 Proven in Production:**
-- ✅ Successfully analyzed **complex_example.exe** (62 KB PE, C code)
-  - Detected hardcoded passwords: `super_secret_password`
-  - Found hidden flag: `FLAG{test_secret_123}`
-  - Decompiled XOR encoding with key 0x42
-  - Identified security vulnerabilities in validation logic
-
-- ✅ Solved **memory_minder** CTF challenge (2.5 MB Mach-O, Go)
-  - Analyzed 2,167 functions in ~30 seconds
-  - Extracted flag from 28 Rune structures
-  - **Flag:** `HTB{M3M0RY_R3W1D_SNOWGL0B3}`
-  - Demonstrated cross-platform capability (ELF/PE/Mach-O)
-
-**🐍 New Python Analysis Scripts** (`scripts/` directory):
-- 8 production-ready analysis tools
-- HTML report generation
-- Binary comparison (diff)
-- CTF flag extraction
-- Function/string search with regex
-- Import capability detection
-
-**📊 Test Results:**
-```
-Unit Tests:        28/28 passing (100%)
-Integration Tests: 19/19 passing (100%)
-Total Time:        68.7s
-```
+- **New MCP tools**: disassemble, xrefs, exports, and call graph (JSON/DOT/Mermaid)
+- **Packing + section heuristics**: entropy checks, packer signatures, RWX/high-entropy flags
+- **Import enrichment**: capability tagging + risk levels in analysis output
+- **x86 expansion**: 32-bit and 16-bit (MZ/COM/boot sector) load hints
+- **Utility upgrades**: system strings fallback and PyInstaller/UPX helpers
 
 ---
 
 ## Features
 
 ### Core Analysis
-- **Full Binary Analysis**: Analyze ELF/PE/Mach-O binaries with Ghidra 12.0
-- **Decompilation**: Get C pseudocode for any function (powered by PyGhidra 3.0)
-- **Function Listing**: List all functions with advanced filtering
-- **String Extraction**: Extract strings with encoding detection
-- **Import Analysis**: View imported functions grouped by library
-- **Hexdump**: Dump raw bytes with virtual address mapping
-- **Smart Caching**: SQLite-based cache with SHA256 hash keys
+- **Full Binary Analysis**: ELF/PE/Mach-O/MZ/COM/RAW via Ghidra 12.0
+- **Decompilation**: C pseudocode per function (PyGhidra 3.0)
+- **Disassembly**: Function or address-range instruction listings
+- **Function Listing**: Filters by name/size, optional thunk/external filters
+- **String Extraction**: Encoding-aware strings with optional system `strings` fallback
+- **Import + Export Listing**: Imports categorized by capability/risk, exports supported
+- **Cross-References**: Xrefs to/from specific addresses
+- **Call Graphs**: JSON/DOT/Mermaid graph output
+- **Hexdump**: VA-aware dump with ELF segment mapping
+- **Smart Caching**: SQLite cache keyed by SHA-256
 
-### Security Analysis
-- Hardcoded secret detection
-- Password/key vulnerability scanning
-- Dangerous function identification (system, exec, etc.)
-- Binary capability detection (network, crypto, file I/O)
+### Security/Heuristics
+- **Packing detection**: entropy + packer signatures (UPX, PyInstaller, Themida, etc.)
+- **Section analysis**: RWX and high-entropy anomalies
+- **Import risk tagging**: network/crypto/process/file I/O capability labels
 
 ### Multi-Format Support
 | Format | Status | Notes |
 |--------|--------|-------|
-| ELF | ✅ Fully Supported | x86_64, with VA→file offset mapping |
-| PE  | ✅ Tested | Windows executables (32/64-bit) |
+| ELF | ✅ Fully Supported | x86_64, VA→file offset mapping |
+| PE  | ✅ Tested | 32/64-bit Windows executables |
 | Mach-O | ✅ Tested | macOS binaries |
+| MZ/COM/RAW | ✅ Supported | 16-bit DOS/boot images with load hints |
 | ARM | ⏸️ Future | Processor config only |
 
 ---
@@ -79,9 +59,9 @@ Total Time:        68.7s
 ### Prerequisites
 
 - **Node.js** 20+
-- **Python** 3.9+ (with pyghidra)
+- **Python** 3.10+ (with pyghidra)
 - **Java** 17+
-- **Ghidra** 12.0+ (built release, not source)
+- **Ghidra** 12.0+ (release install or snap, not source tree)
 
 ### Installation
 
@@ -90,17 +70,32 @@ Total Time:        68.7s
 git clone https://github.com/yourusername/arael.git
 cd arael
 
-# Install Python dependencies
+# Optional: create a local venv for PyGhidra
+python3 -m venv .venv
+source .venv/bin/activate
+# On Windows: .venv\\Scripts\\activate
+
+# Install Python dependencies (PyGhidra)
 pip install pyghidra
 
 # Install Node dependencies
 npm install
 
 # Configure environment
-cp .env.example .env
-# Edit .env with your paths:
-#   GHIDRA_PATH="C:\path\to\ghidra_12.0_PUBLIC"
-#   ARAEL_PYTHON="C:\Python313\python.exe"
+cat > .env <<'EOF'
+# WSL
+GHIDRA_PATH="/path/to/ghidra_12.0_PUBLIC"
+ARAEL_PYTHON="/path/to/arael/.venv/bin/python"
+
+# Windows
+GHIDRA_PATH="C:\\path\\to\\ghidra_12.0_PUBLIC"
+ARAEL_PYTHON="C:\\Python311\\python.exe"
+EOF
+
+# The loader auto-selects the WSL/Windows block based on your platform.
+# Optional:
+#   ARAEL_USE_SYSTEM_STRINGS=1
+#   ARAEL_STRINGS_GREP="FLAG|password"
 
 # Build
 npm run build
@@ -164,19 +159,31 @@ arael cache --clear
 ```python
 # Analyze a binary
 result = await arael_analyze({
-    "binary_path": "./suspicious.exe"
+    "filepath": "./suspicious.exe"
 })
 
 # Decompile a function
 code = await arael_decompile({
-    "binary_path": "./binary",
-    "function_name": "main"
+    "filepath": "./binary",
+    "function": "main"
 })
 
 # Search for functions
 funcs = await arael_functions({
-    "binary_path": "./binary",
-    "name_filter": "crypto|aes|encrypt"
+    "filepath": "./binary",
+    "filter": { "namePattern": "crypto|aes|encrypt" }
+})
+
+# Cross-references and call graph
+xrefs = await arael_xrefs({
+    "filepath": "./binary",
+    "address": "0x401000",
+    "direction": "to"
+})
+
+graph = await arael_callgraph({
+    "filepath": "./binary",
+    "format": "dot"
 })
 ```
 
@@ -303,12 +310,16 @@ Found 28 rune structures!
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `arael_analyze` | Full binary analysis | `binary_path` |
-| `arael_decompile` | Decompile function | `binary_path`, `function_name` or `address` |
-| `arael_functions` | List functions | `binary_path`, `name_filter?` |
-| `arael_strings` | Extract strings | `binary_path`, `min_length?`, `encoding?` |
-| `arael_imports` | List imports | `binary_path` |
-| `arael_hexdump` | Raw byte dump | `binary_path`, `address`, `length` |
+| `arael_analyze` | Full binary analysis | `filepath`, `force?` |
+| `arael_decompile` | Decompile function | `filepath`, `function` |
+| `arael_disassemble` | Disassemble function or range | `filepath`, `function?`, `startAddress?`, `length?` |
+| `arael_xrefs` | Cross-references to/from address | `filepath`, `address`, `direction?`, `maxResults?` |
+| `arael_functions` | List functions | `filepath`, `filter?` |
+| `arael_strings` | Extract strings | `filepath`, `minLength?`, `encoding?` |
+| `arael_imports` | List imports | `filepath` |
+| `arael_exports` | List exports | `filepath`, `filter?` |
+| `arael_callgraph` | Call graph (JSON/DOT/Mermaid) | `filepath`, `format?`, `rootFunction?`, `maxDepth?` |
+| `arael_hexdump` | Raw byte dump | `filepath`, `start`, `length?`, `width?` |
 
 ---
 
@@ -339,20 +350,20 @@ npm run test:connection
 arael/
 ├── src/
 │   ├── cli/           # CLI entry points
-│   ├── mcp/           # MCP server & tools
+│   ├── mcp/           # MCP server & handlers (analyze, decompile, disassemble, xrefs, callgraph, exports)
 │   ├── ghidra/        # Ghidra integration
-│   │   ├── scripts/   # Python analysis scripts
-│   │   ├── bridge.ts  # ghidra-bridge (deprecated in v12.0)
+│   │   ├── scripts/   # PyGhidra scripts (run_analysis, disassemble, xrefs, exports, callgraph)
+│   │   ├── bridge.ts  # ghidra-bridge (optional)
 │   │   ├── headless.ts # PyGhidra headless mode
 │   │   └── connection.ts # Connection manager
 │   ├── cache/         # SQLite caching
 │   ├── output/        # Schema & builders
-│   └── utils/         # ELF parsing, preflight, etc.
+│   └── utils/         # Preflight, packing, sections, import-analysis, pyc-decompiler
 ├── tests/
-│   ├── unit/          # 28 unit tests
-│   ├── integration/   # 19 integration tests
+│   ├── unit/          # Unit tests
+│   ├── integration/   # Integration tests
 │   └── fixtures/      # Test binaries
-├── scripts/           # Python analysis tools (8 scripts)
+├── scripts/           # Python analysis helpers
 └── docs/              # Documentation
 ```
 
@@ -362,7 +373,7 @@ arael/
 - **Analysis:** Ghidra 12.0 + PyGhidra 3.0
 - **Cache:** SQLite (better-sqlite3)
 - **Testing:** Jest 29.7
-- **Python:** 3.13 (Windows) / 3.x (Linux/WSL)
+- **Python:** 3.10+ (venv recommended for PyGhidra)
 
 ---
 
@@ -371,7 +382,7 @@ arael/
 - [Installation Guide](docs/INSTALLATION.md) - Detailed setup instructions
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Local LLM Integration](docs/LOCAL_LLM.md) - Use with Ollama/LM Studio
-- [PRD v2.2.1](PRD_Arael_v2.2.1.md) - Product requirements & implementation status
+- [PRD v2.4](PRD_Arael_v2.4.md) - Product requirements & implementation status
 
 ---
 
@@ -385,10 +396,11 @@ arael/
 - Preflight validation
 
 ### ✅ Phase 2: Core Tools (Complete)
-- All 6 MCP tools functional
-- Decompilation with pseudocode
-- String extraction
-- Import analysis
+- All 10 MCP tools functional (disassemble, xrefs, exports, callgraph added)
+- Decompilation with pseudocode + disassembly support
+- String extraction with encoding controls
+- Import analysis with capability/risk tagging
+- Export listing + call graph generation
 - Hexdump with VA mapping
 
 ### ⏸️ Phase 3: Polish & Publishing (Pending)
@@ -402,10 +414,10 @@ arael/
 
 ## 🏆 Achievements
 
-- **100% Test Pass Rate** (47/47 tests)
-- **Multi-Format Support** (ELF, PE, Mach-O validated)
+- **Extensive Test Coverage** (unit + integration suites)
+- **Multi-Format Support** (ELF, PE, Mach-O, MZ/COM/RAW)
+- **Expanded MCP Surface** (10 tools including callgraph/xrefs/disassemble/exports)
 - **CTF Proven** (Successfully solved memory_minder)
-- **Production Ready** (Analyzed real-world malware samples)
 
 ---
 
