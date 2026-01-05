@@ -67,7 +67,7 @@ Arael is an MCP (Model Context Protocol) server that bridges Ghidra's powerful b
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/arael.git
+git clone https://github.com/raulradulescu/arael.git
 cd arael
 
 # Optional: create a local venv for PyGhidra
@@ -153,6 +153,19 @@ arael hexdump ./binary --address 0x401000 --length 128
 arael cache --stats
 arael cache --clear
 ```
+
+### Slash Commands (Claude Code)
+
+| Command | Usage | Description |
+|---------|-------|-------------|
+| `/arael` | `/arael ./binary` | Full binary analysis |
+| `/decompile` | `/decompile main` | Get C pseudocode |
+| `/disasm` | `/disasm 0x401000` | Get assembly |
+| `/xrefs` | `/xrefs decrypt` | Cross-references |
+| `/callgraph` | `/callgraph main` | Call graph |
+| `/strings` | `/strings flag` | Search strings |
+| `/imports` | `/imports` | List imports |
+| `/hexdump` | `/hexdump 0x401000` | Raw bytes |
 
 ### MCP Tools (via Claude Code)
 
@@ -389,26 +402,36 @@ arael/
 ## 🎯 Roadmap
 
 ### ✅ Phase 1: Foundation (Complete)
-- Project scaffold
-- PyGhidra 3.0 integration
-- Headless mode
-- SQLite cache
-- Preflight validation
+- Project scaffold with TypeScript & Jest
+- PyGhidra 3.0 integration (Ghidra 12.0+)
+- Headless mode with run_analysis.py
+- SQLite cache implementation
+- Preflight validation (ELF/PE/Mach-O)
 
 ### ✅ Phase 2: Core Tools (Complete)
-- All 10 MCP tools functional (disassemble, xrefs, exports, callgraph added)
-- Decompilation with pseudocode + disassembly support
-- String extraction with encoding controls
-- Import analysis with capability/risk tagging
-- Export listing + call graph generation
-- Hexdump with VA mapping
+- `arael_analyze`, `arael_functions`, `arael_decompile`
+- `arael_strings`, `arael_imports`, `arael_hexdump`
 
-### ⏸️ Phase 3: Polish & Publishing (Pending)
-- npm package publish
-- MCP server registration
+### ✅ Phase 3: Advanced Tools (Complete)
+- `arael_disassemble`, `arael_xrefs`, `arael_exports`, `arael_callgraph`
+- Packing detection (UPX, PyInstaller, 10+ signatures)
+- Section analysis (entropy, RWX anomalies)
+- Import categorization (12 capability categories)
+
+### ✅ Phase 4: Polish & Docs (Complete)
 - Comprehensive error messages
-- Performance optimization
-- Additional binary formats (ARM, RISC-V)
+- INSTALLATION.md, TROUBLESHOOTING.md, LOCAL_LLM.md
+- .env configuration support
+
+### ✅ Phase 5: Architecture & Bytecode (Complete)
+- x86 32-bit architecture support
+- x86 16-bit architecture support (DOS/real mode)
+- .pyc decompilation (pycdc + uncompyle6 + marshal/dis)
+
+### ⏸️ Phase 6: Publishing (Pending)
+- npm package publish
+- Claude Code MCP integration testing
+- ARM64/ARM32 architecture support
 
 ---
 
