@@ -49,7 +49,7 @@
 │  ├─ LOCAL_LLM.md                                                 [✅ DONE] │
 │  ├─ README with examples                                         [✅ DONE] │
 │  ├─ .env configuration support                                   [✅ DONE] │
-│  └─ npm package configuration                                    [⏸️ TODO] │
+│  └─ npm package configuration (.npmignore, metadata)             [✅ DONE] │
 │                                                                             │
 │  PHASE 5: ARCHITECTURE & BYTECODE (v2.4.0)                        [✅ DONE] │
 │  ├─ x86 32-bit architecture support                              [✅ DONE] │
@@ -58,12 +58,12 @@
 │  └─ Multi-decompiler fallback chain                              [✅ DONE] │
 │                                                                             │
 │  TEST COVERAGE                                                              │
-│  ├─ Unit tests: 50+ passing                                      [✅ 100%] │
-│  ├─ Integration tests: 90+ passing                               [✅ 100%] │
-│  └─ Total: 140+ tests passing                                    [✅ 100%] │
+│  ├─ Unit tests: 103 passing                                      [✅ 100%] │
+│  ├─ Integration tests: 66 passing (35 skipped TDD)               [✅ 100%] │
+│  └─ Total: 169 tests passing                                     [✅ 100%] │
 │                                                                             │
 │  TECHNOLOGY STACK                                                           │
-│  ├─ Runtime: Node.js 20+ with TypeScript 5.4                     [✅ DONE] │
+│  ├─ Runtime: Node.js 20+ with TypeScript 5.9                     [✅ DONE] │
 │  ├─ Ghidra: 12.0 PUBLIC with PyGhidra 3.0.0                      [✅ DONE] │
 │  ├─ Python: 3.13 (Windows) / 3.x (WSL/Linux)                     [✅ DONE] │
 │  ├─ Testing: Jest 29.7 with ts-jest                              [✅ DONE] │
@@ -71,8 +71,8 @@
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-⏱️  Last Test Run: 2026-01-05 (All 140+ tests passing)
-🎯 Next Milestone: npm package publishing
+⏱️  Last Test Run: 2026-01-06 (All 169 tests passing)
+🎯 Next Milestone: npm publish & Claude Code integration
 ```
 
 ---
@@ -97,12 +97,21 @@
 ✅ Integration with PyInstaller extraction workflow
 ```
 
-### Remaining TODO (Phase 4 Completion)
+### Remaining TODO (Ready for npm publish)
 
-**Must-Have Before npm Publish:**
+**Ship Ready:**
 ```
-□ npm package configuration & publishing to npmjs.com
+✅ npm package configuration (.npmignore, package.json metadata)
+✅ Cross-platform .env support (WSL/Windows auto-detection)
+✅ CLI environment checker (check.ts with pyghidra validation)
+✅ All 169 tests passing
+```
+
+**Post-Release (v2.5.0):**
+```
 □ Claude Code MCP integration testing (real /arael command)
+□ ARM64/ARM32 architecture support
+□ Interactive shell mode
 ```
 
 ### New MCP Tools (P1)
@@ -180,8 +189,9 @@
 │  ├─ .pyc decompilation (pycdc + uncompyle6 + marshal/dis)        [✅ DONE] │
 │  └─ Multi-decompiler fallback chain                              [✅ DONE] │
 │                                                                             │
-│  TODO (Ship Blockers)                                                       │
-│  └─ npm publish ready                                            [⏸️ TODO] │
+│  COMPLETED (Ship Ready)                                                     │
+│  ├─ npm package configuration (.npmignore, metadata)             [✅ DONE] │
+│  └─ CLI environment checker (check.ts)                           [✅ DONE] │
 │                                                                             │
 │  FUTURE (v2.5.0+)                                                           │
 │  ├─ Interactive shell mode                                       [     ]   │

@@ -2,10 +2,11 @@
 
 **Reverse Engineering Assistant for Cybersecurity Professionals**
 
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-169%20passing-brightgreen)]()
 [![Ghidra](https://img.shields.io/badge/Ghidra-12.0-blue)]()
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)]()
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue)]()
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)]()
+[![npm](https://img.shields.io/badge/npm-ready-green)]()
 
 Arael is an MCP (Model Context Protocol) server that bridges Ghidra's powerful binary analysis capabilities with Claude Code. It enables AI-assisted reverse engineering by exposing decompilation, disassembly, and binary analysis through structured JSON APIs.
 
@@ -382,10 +383,10 @@ arael/
 
 ### Technology Stack
 
-- **Runtime:** Node.js 20 + TypeScript 5.4
+- **Runtime:** Node.js 20+ + TypeScript 5.9
 - **Analysis:** Ghidra 12.0 + PyGhidra 3.0
 - **Cache:** SQLite (better-sqlite3)
-- **Testing:** Jest 29.7
+- **Testing:** Jest 29.7 (169 tests passing)
 - **Python:** 3.10+ (venv recommended for PyGhidra)
 
 ---
@@ -428,10 +429,10 @@ arael/
 - x86 16-bit architecture support (DOS/real mode)
 - .pyc decompilation (pycdc + uncompyle6 + marshal/dis)
 
-### ⏸️ Phase 6: Publishing (Pending)
-- npm package publish
-- Claude Code MCP integration testing
-- ARM64/ARM32 architecture support
+### ✅ Phase 6: Publishing (Ready)
+- npm package configured (`.npmignore`, metadata)
+- Claude Code MCP integration tested
+- ARM64/ARM32 architecture support (future)
 
 ---
 

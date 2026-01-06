@@ -27,11 +27,23 @@ npm run test:integration
 
 ## Environment Setup
 
-Create a `.env` file in project root:
+Create a `.env` file in project root. The file supports **platform-specific sections** using `# WSL` and `# Windows` comments as section headers:
+
 ```env
-GHIDRA_PATH=C:/path/to/ghidra_12.0_PUBLIC
-ARAEL_PYTHON=C:/Python313/python.exe
+# Default settings (used on Linux/macOS)
+GHIDRA_PATH=/opt/ghidra_12.0_PUBLIC
+ARAEL_PYTHON=python3
+
+# WSL
+GHIDRA_PATH=/mnt/c/path/to/ghidra_12.0_PUBLIC
+ARAEL_PYTHON=/mnt/c/path/to/.venv/bin/python
+
+# Windows
+GHIDRA_PATH=C:\path\to\ghidra_12.0_PUBLIC
+ARAEL_PYTHON=C:\Python313\python.exe
 ```
+
+The loader (`src/utils/env.ts`) auto-detects the platform and applies the correct section.
 
 **Requirements:**
 - Node.js 20+
@@ -61,12 +73,12 @@ src/
 │   ├── bridge.ts           # Bridge mode (persistent connection)
 │   └── scripts/            # Python scripts for Ghidra
 │       ├── project_loader.py   # Shared PyGhidra loader
-│       ├── analyze.py
-│       ├── decompile.py
-│       ├── disassemble.py
-│       ├── xrefs.py
-│       ├── exports.py
-│       └── callgraph.py
+│       ├── run_analysis.py     # Full binary analysis
+│       ├── arael_extract.py    # Decompilation & extraction
+│       ├── disassemble.py      # Assembly listing
+│       ├── xrefs.py            # Cross-reference analysis
+│       ├── exports.py          # Symbol exports
+│       └── callgraph.py        # Call graph generation
 ├── output/
 │   ├── schema.ts           # TypeScript interfaces for output
 │   └── builder.ts          # AnalysisBuilder class

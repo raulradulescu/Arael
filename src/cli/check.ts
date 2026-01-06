@@ -7,6 +7,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { GhidraBridge } from '../ghidra/bridge';
+import { loadEnvFromFile } from '../utils/env';
+
+loadEnvFromFile();
 
 interface CheckResult {
   name: string;
@@ -68,34 +71,56 @@ async function runChecks(): Promise<CheckResult[]> {
 
   // Check Python
   const { execSync } = await import('child_process');
+  const pythonCmd = process.env['ARAEL_PYTHON'] ?? (process.platform === 'win32' ? 'python' : 'python3');
   try {
-    const pythonVersion = execSync('python3 --version', { encoding: 'utf-8' }).trim();
+    const pythonVersion = execSync(`"${pythonCmd}" --version`, { encoding: 'utf-8' }).trim();
     results.push({
       name: 'Python 3',
       status: 'pass',
-      message: pythonVersion
+      message: `${pythonVersion} (${pythonCmd})`
     });
 
-    // Check ghidra-bridge
+    // Check pyghidra
     try {
-      execSync('python3 -c "import ghidra_bridge"', { encoding: 'utf-8' });
+      execSync(`"${pythonCmd}" -c "import pyghidra"`, { encoding: 'utf-8' });
       results.push({
-        name: 'ghidra-bridge',
+        name: 'pyghidra',
         status: 'pass',
         message: 'Installed'
       });
     } catch {
       results.push({
+        name: 'pyghidra',
+        status: 'warn',
+        message: 'Not installed (run: pip install pyghidra)'
+      });
+    }
+
+    // Check ghidra-bridge (optional)
+    try {
+      execSync(`"${pythonCmd}" -c "import ghidra_bridge"`, { encoding: 'utf-8' });
+      results.push({
+        name: 'ghidra-bridge',
+        status: 'pass',
+        message: 'Installed (optional)'
+      });
+    } catch {
+      results.push({
         name: 'ghidra-bridge',
         status: 'warn',
-        message: 'Not installed (run: pip install ghidra-bridge)'
+        message: 'Not installed (optional, for bridge mode)'
       });
     }
   } catch {
     results.push({
       name: 'Python 3',
       status: 'fail',
-      message: 'Not found in PATH'
+      message: `Not found (tried: ${pythonCmd})`
+    });
+    results.push({
+      name: 'pyghidra',
+      status: 'fail',
+      message: 'Cannot check (Python not available)'
     });
     results.push({
       name: 'ghidra-bridge',

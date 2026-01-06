@@ -66,7 +66,7 @@ describeOrSkip('arael_analyze (integration)', () => {
     const result = await analyzeHandler({ filepath: testBinary });
 
     expect(result.metadata).toBeDefined();
-    expect(result.metadata.araelVersion).toBe('1.0.0');
+    expect(result.metadata.araelVersion).toBe('2.4.0');
     expect(result.metadata.connectionMode).toMatch(/bridge|headless/);
 
     expect(result.binary).toBeDefined();

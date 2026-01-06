@@ -501,10 +501,9 @@ export async function extractPyInstaller(
     const proc = spawn('python3', ['-m', 'pyinstxtractor', binaryPath, '-o', output]);
 
     let stderr = '';
-    let stdout = '';
 
-    proc.stdout.on('data', (data) => {
-      stdout += data.toString();
+    proc.stdout.on('data', () => {
+      // Output captured but not used
     });
 
     proc.stderr.on('data', (data) => {

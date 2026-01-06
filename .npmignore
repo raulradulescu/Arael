@@ -1,0 +1,38 @@
+# Source files (only publish dist/)
+src/
+tests/
+coverage/
+
+# Config files
+tsconfig.json
+tsconfig.eslint.json
+jest.config.js
+.eslintrc.js
+.env
+.env.*
+
+# Dev files
+.git/
+.github/
+.vscode/
+.idea/
+*.log
+
+# Documentation (README is included by default)
+docs/
+PRD_*.md
+AGENTS.md
+
+# Test fixtures
+tests/
+
+# Large directories
+ghidra-master/
+hxp-ctf/
+P1K4Z80/
+
+# Temp files
+*.tmp
+*.sqlite
+*.sqlite3
+.arael/

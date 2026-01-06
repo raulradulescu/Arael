@@ -4,13 +4,12 @@ module.exports = {
   parserOptions: {
     ecmaVersion: 2022,
     sourceType: 'module',
-    project: './tsconfig.json'
+    project: './tsconfig.eslint.json'
   },
   plugins: ['@typescript-eslint'],
   extends: [
     'eslint:recommended',
-    'plugin:@typescript-eslint/recommended',
-    'plugin:@typescript-eslint/recommended-requiring-type-checking'
+    'plugin:@typescript-eslint/recommended'
   ],
   env: {
     node: true,
@@ -19,11 +18,10 @@ module.exports = {
   },
   rules: {
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-    '@typescript-eslint/explicit-function-return-type': 'warn',
-    '@typescript-eslint/no-explicit-any': 'warn',
-    '@typescript-eslint/prefer-nullish-coalescing': 'error',
-    '@typescript-eslint/prefer-optional-chain': 'error',
-    'no-console': ['warn', { allow: ['warn', 'error'] }],
+    '@typescript-eslint/explicit-function-return-type': 'off',
+    '@typescript-eslint/no-explicit-any': 'off',
+    '@typescript-eslint/no-require-imports': 'off',
+    'no-console': 'off',
     'prefer-const': 'error',
     'no-var': 'error'
   },

@@ -181,8 +181,8 @@ describeOrSkip('arael_xrefs (integration)', () => {
     expect(Array.isArray(result.references)).toBe(true);
 
     // Should have both 'to' and 'from' references
-    const toRefs = result.references.filter((ref: any) => ref.hasOwnProperty('from'));
-    const fromRefs = result.references.filter((ref: any) => ref.hasOwnProperty('to'));
+    const toRefs = result.references.filter((ref: any) => Object.hasOwn(ref, 'from'));
+    const fromRefs = result.references.filter((ref: any) => Object.hasOwn(ref, 'to'));
 
     // Both arrays should exist (even if empty)
     expect(toRefs).toBeTruthy();
@@ -219,7 +219,7 @@ describeOrSkip('arael_xrefs (integration)', () => {
     expect(result.references).toBeTruthy();
 
     // Check that all references have valid types
-    const validTypes = ['call', 'jump', 'data', 'read', 'write'];
+    const validTypes = ['call', 'jump', 'data', 'read', 'write', 'indirection'];
     result.references.forEach((ref: any) => {
       expect(validTypes).toContain(ref.type.toLowerCase());
     });
