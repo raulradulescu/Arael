@@ -262,6 +262,14 @@ function machineFromElf(machine: number): string {
       return 'arm';
     case 0xb7:
       return 'aarch64';
+    case 0xf3:
+      return 'riscv';
+    case 0x08:
+      return 'mips';
+    case 0x14:
+      return 'ppc';
+    case 0x15:
+      return 'ppc64';
     default:
       return `unknown(0x${machine.toString(16)})`;
   }
@@ -273,7 +281,64 @@ function machineFromPe(machine: number): string {
       return 'i386';
     case 0x8664:
       return 'x86_64';
+    case 0x1c0:
+      return 'arm';
+    case 0x1c4:
+      return 'armnt';  // ARM Thumb-2 little-endian
+    case 0xaa64:
+      return 'aarch64';
     default:
       return `unknown(0x${machine.toString(16)})`;
   }
 }
+
+/**
+ * Get Ghidra processor/language ID for architecture
+ */
+export function getGhidraLanguageId(architecture: string, bits: number): string {
+  const arch = architecture.toLowerCase();
+
+  if (arch === 'x86_64' || arch === 'amd64') {
+    return 'x86:LE:64:default';
+  }
+  if (arch === 'i386' || arch === 'x86') {
+    return 'x86:LE:32:default';
+  }
+  if (arch === '8086') {
+    return 'x86:LE:16:Real Mode';
+  }
+  if (arch === 'arm' || arch === 'armnt') {
+    return 'ARM:LE:32:v8';
+  }
+  if (arch === 'aarch64' || arch === 'arm64') {
+    return 'AARCH64:LE:64:v8A';
+  }
+  if (arch === 'mips') {
+    return bits === 64 ? 'MIPS:BE:64:default' : 'MIPS:BE:32:default';
+  }
+  if (arch === 'ppc' || arch === 'powerpc') {
+    return 'PowerPC:BE:32:default';
+  }
+  if (arch === 'ppc64') {
+    return 'PowerPC:BE:64:default';
+  }
+  if (arch === 'riscv') {
+    return bits === 64 ? 'RISCV:LE:64:default' : 'RISCV:LE:32:default';
+  }
+
+  return 'default';
+}
+
+/**
+ * List of supported architectures
+ */
+export const SUPPORTED_ARCHITECTURES = [
+  { name: 'x86_64', description: '64-bit x86 (AMD64/Intel 64)', status: 'full' },
+  { name: 'i386', description: '32-bit x86 (IA-32)', status: 'full' },
+  { name: '8086', description: '16-bit x86 (Real Mode/DOS)', status: 'full' },
+  { name: 'arm', description: '32-bit ARM', status: 'supported' },
+  { name: 'aarch64', description: '64-bit ARM (ARM64)', status: 'supported' },
+  { name: 'mips', description: 'MIPS (32/64-bit)', status: 'basic' },
+  { name: 'ppc', description: 'PowerPC (32/64-bit)', status: 'basic' },
+  { name: 'riscv', description: 'RISC-V (32/64-bit)', status: 'basic' },
+] as const;

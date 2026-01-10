@@ -1,6 +1,6 @@
 {
   "name": "arael-re",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "Reverse engineering assistant bridging Ghidra with Claude Code via MCP",
   "main": "dist/mcp/server.js",
   "types": "dist/mcp/server.d.ts",

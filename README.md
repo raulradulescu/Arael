@@ -2,7 +2,7 @@
 
 **Reverse Engineering Assistant for Cybersecurity Professionals**
 
-[![Tests](https://img.shields.io/badge/tests-169%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-271%20total-brightgreen)]()
 [![Ghidra](https://img.shields.io/badge/Ghidra-12.0-blue)]()
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)]()
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)]()
@@ -15,7 +15,15 @@ Arael is an MCP (Model Context Protocol) server that bridges Ghidra's powerful b
 
 ---
 
-## ✨ **What's New in v2.4**
+## ✨ **What's New in v2.5**
+
+- **Interactive Shell**: `arael shell ./binary` - Full REPL with decompile, disasm, xrefs, callgraph, hexdump
+- **Batch Analysis**: `arael batch ./samples/*.exe` - Analyze multiple binaries with glob patterns
+- **YARA Scanning**: `arael yara ./binary` - Built-in rules for packers, crypto, network, anti-debug
+- **HTML Reports**: `arael report ./binary` - Professional dark-theme analysis reports
+- **ARM Support**: ARM64/ARM32 architecture detection and Ghidra language mapping
+
+### Previous: v2.4
 
 - **New MCP tools**: disassemble, xrefs, exports, and call graph (JSON/DOT/Mermaid)
 - **Packing + section heuristics**: entropy checks, packer signatures, RWX/high-entropy flags
@@ -47,11 +55,12 @@ Arael is an MCP (Model Context Protocol) server that bridges Ghidra's powerful b
 ### Multi-Format Support
 | Format | Status | Notes |
 |--------|--------|-------|
-| ELF | ✅ Fully Supported | x86_64, VA→file offset mapping |
+| ELF | ✅ Fully Supported | x86_64, x86, ARM64, ARM32 |
 | PE  | ✅ Tested | 32/64-bit Windows executables |
 | Mach-O | ✅ Tested | macOS binaries |
 | MZ/COM/RAW | ✅ Supported | 16-bit DOS/boot images with load hints |
-| ARM | ⏸️ Future | Processor config only |
+| ARM64 | ✅ Supported | macOS Apple Silicon, Android, IoT |
+| ARM32 | ✅ Supported | Embedded, IoT, Android |
 
 ---
 
@@ -141,11 +150,23 @@ arael functions ./binary --filter "^main\."
 arael decompile ./binary --function validate_password
 arael decompile ./binary --address 0x140001450
 
+# Disassemble a function
+arael disassemble ./binary --function main
+
 # Extract strings
 arael strings ./binary --min-length 6
 
 # List imports with capability detection
 arael imports ./binary
+
+# List exports
+arael exports ./binary
+
+# Cross-references
+arael xrefs ./binary --address 0x401000 --direction both
+
+# Call graph generation
+arael callgraph ./binary --format mermaid --root main
 
 # Hexdump with address translation
 arael hexdump ./binary --address 0x401000 --length 128
@@ -153,6 +174,26 @@ arael hexdump ./binary --address 0x401000 --length 128
 # Cache management
 arael cache --stats
 arael cache --clear
+```
+
+### New in v2.5: Interactive & Batch
+
+```bash
+# Interactive shell (REPL mode)
+arael shell ./binary
+# Commands: help, info, functions, strings, imports, exports,
+#           decompile <func>, disasm <func>, xrefs <addr>,
+#           callgraph [func], hexdump <addr>, load <file>, exit
+
+# Batch analysis with glob patterns
+arael batch "./samples/*.exe" --output ./results
+
+# YARA scanning with built-in rules
+arael yara ./binary
+# Detects: packers (UPX, PyInstaller, VMProtect), crypto, network, anti-debug
+
+# Generate HTML analysis report
+arael report ./binary --output report.html
 ```
 
 ### Slash Commands (Claude Code)
@@ -386,7 +427,7 @@ arael/
 - **Runtime:** Node.js 20+ + TypeScript 5.9
 - **Analysis:** Ghidra 12.0 + PyGhidra 3.0
 - **Cache:** SQLite (better-sqlite3)
-- **Testing:** Jest 29.7 (169 tests passing)
+- **Testing:** Jest 29.7 (271 tests: 168 integration + 103 unit)
 - **Python:** 3.10+ (venv recommended for PyGhidra)
 
 ---
@@ -396,7 +437,7 @@ arael/
 - [Installation Guide](docs/INSTALLATION.md) - Detailed setup instructions
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Local LLM Integration](docs/LOCAL_LLM.md) - Use with Ollama/LM Studio
-- [PRD v2.4](PRD_Arael_v2.4.md) - Product requirements & implementation status
+- [PRD v2.5](PRD_Arael_v2.5.md) - Product requirements & implementation status
 
 ---
 
@@ -429,19 +470,29 @@ arael/
 - x86 16-bit architecture support (DOS/real mode)
 - .pyc decompilation (pycdc + uncompyle6 + marshal/dis)
 
-### ✅ Phase 6: Publishing (Ready)
-- npm package configured (`.npmignore`, metadata)
-- Claude Code MCP integration tested
-- ARM64/ARM32 architecture support (future)
+### ✅ Phase 6: CLI Enhancement (Complete - v2.5)
+- Interactive shell (`arael shell`) - Full REPL mode
+- Batch analysis (`arael batch`) - Glob pattern support
+- YARA scanning (`arael yara`) - Built-in detection rules
+- HTML reports (`arael report`) - Dark theme output
+- ARM64/ARM32 architecture support
+
+### ⏳ Phase 7: Thesis Enhancement (Planned)
+- `arael benchmark` - Performance evaluation
+- `arael ask` - LLM-assisted analysis
+- `arael vulnscan` - Vulnerability detection
+- `arael diff` - Binary comparison
 
 ---
 
 ## 🏆 Achievements
 
-- **Extensive Test Coverage** (unit + integration suites)
-- **Multi-Format Support** (ELF, PE, Mach-O, MZ/COM/RAW)
+- **Extensive Test Coverage** (168 integration + 103 unit tests)
+- **Multi-Format Support** (ELF, PE, Mach-O, MZ/COM/RAW, ARM)
 - **Expanded MCP Surface** (10 tools including callgraph/xrefs/disassemble/exports)
-- **CTF Proven** (Successfully solved memory_minder)
+- **Interactive REPL** (Full shell mode with all analysis commands)
+- **YARA Integration** (Built-in rules for malware/packer detection)
+- **CTF Proven** (Successfully solved memory_minder, chekhov)
 
 ---
 
