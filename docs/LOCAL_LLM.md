@@ -10,14 +10,36 @@ Use Arael's CLI directly with your local LLM:
 # Full analysis (JSON output)
 arael analyze ./binary
 
-# Human-readable summary
-arael analyze ./binary --output summary
+# List functions
+arael functions ./binary --filter "main"
 
-# Specific queries
-arael functions ./binary
+# Decompile and disassemble
 arael decompile ./binary --function main
+arael disassemble ./binary --function main
+
+# Strings and imports
 arael strings ./binary --min-length 6
 arael imports ./binary
+arael exports ./binary
+
+# Cross-references and call graph
+arael xrefs ./binary --address 0x401000
+arael callgraph ./binary --format mermaid --root main
+
+# Hexdump
+arael hexdump ./binary --address 0x401000 --length 128
+
+# Interactive shell (v2.5)
+arael shell ./binary
+
+# Batch analysis (v2.5)
+arael batch "./samples/*.exe" --output ./results
+
+# YARA scanning (v2.5)
+arael yara ./binary
+
+# HTML report (v2.5)
+arael report ./binary --output report.html
 ```
 
 ## Option 2: System Prompt
@@ -33,16 +55,24 @@ Available commands:
 - arael analyze <path> - Full binary analysis
 - arael functions <path> [--filter <regex>] - List functions
 - arael decompile <path> --function <name> - Decompile function
+- arael disassemble <path> --function <name> - Disassemble function
 - arael strings <path> [--min-length N] - Extract strings
-- arael imports <path> - List imports
+- arael imports <path> - List imports with capabilities
+- arael exports <path> - List exported symbols
+- arael xrefs <path> --address <addr> - Cross-references
+- arael callgraph <path> --format mermaid - Call graph
 - arael hexdump <path> --address <addr> - Dump bytes
+- arael yara <path> - YARA rule scanning
+- arael shell <path> - Interactive REPL mode
 
 Workflow:
 1. Run arael analyze to get an overview
-2. Review functions and identify interesting targets
-3. Decompile suspicious functions
-4. Cross-reference strings and imports
-`
+2. Check arael yara for packing/malware indicators
+3. Review functions and identify interesting targets
+4. Decompile suspicious functions
+5. Use xrefs to trace data flow
+6. Generate callgraph for program structure
+```
 
 ### Full XML Prompt
 

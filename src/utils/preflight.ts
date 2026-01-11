@@ -3,13 +3,18 @@ import * as path from 'path';
 
 const ELF_MAGIC = Buffer.from([0x7f, 0x45, 0x4c, 0x46]); // \x7fELF
 const MZ_MAGIC = Buffer.from([0x4d, 0x5a]); // MZ
+const MACHO_MAGIC_32 = Buffer.from([0xce, 0xfa, 0xed, 0xfe]); // MH_MAGIC (little-endian)
+const MACHO_MAGIC_64 = Buffer.from([0xcf, 0xfa, 0xed, 0xfe]); // MH_MAGIC_64 (little-endian)
+const MACHO_CIGAM_32 = Buffer.from([0xfe, 0xed, 0xfa, 0xce]); // MH_CIGAM (big-endian)
+const MACHO_CIGAM_64 = Buffer.from([0xfe, 0xed, 0xfa, 0xcf]); // MH_CIGAM_64 (big-endian)
+const MACHO_FAT = Buffer.from([0xca, 0xfe, 0xba, 0xbe]); // FAT_MAGIC (universal binary)
 
 export interface PreflightResult {
   valid: boolean;
   filepath: string;
   absolutePath: string;
   size: number;
-  format: 'ELF' | 'PE' | 'MZ' | 'COM' | 'RAW' | 'unknown';
+  format: 'ELF' | 'PE' | 'MZ' | 'Mach-O' | 'COM' | 'RAW' | 'unknown';
   architecture?: string;
   machine?: string;
   bits?: 16 | 32 | 64;
@@ -75,6 +80,19 @@ export async function validateBinary(filepath: string): Promise<PreflightResult>
 
   if (header.subarray(0, 2).equals(MZ_MAGIC)) {
     return parseMzOrPe(filepath, absolutePath, stats.size, header);
+  }
+
+  // Check for Mach-O formats
+  const magic4 = header.subarray(0, 4);
+  if (magic4.equals(MACHO_MAGIC_64) || magic4.equals(MACHO_CIGAM_64)) {
+    return parseMachO(filepath, absolutePath, stats.size, header, 64, magic4.equals(MACHO_CIGAM_64));
+  }
+  if (magic4.equals(MACHO_MAGIC_32) || magic4.equals(MACHO_CIGAM_32)) {
+    return parseMachO(filepath, absolutePath, stats.size, header, 32, magic4.equals(MACHO_CIGAM_32));
+  }
+  if (magic4.equals(MACHO_FAT)) {
+    // Universal binary - report as 64-bit by default
+    return parseMachO(filepath, absolutePath, stats.size, header, 64, false);
   }
 
   if (ext === '.com') {
@@ -250,6 +268,46 @@ function parseMzOrPe(
     entryPoint: `0x${addressOfEntryPoint.toString(16)}`,
     imageBase: `0x${imageBase.toString(16)}`
   };
+}
+
+function parseMachO(
+  filepath: string,
+  absolutePath: string,
+  size: number,
+  header: Buffer,
+  bits: 32 | 64,
+  isBigEndian: boolean
+): PreflightResult {
+  // CPU type is at offset 4 in Mach-O header
+  const cpuType = isBigEndian ? header.readUInt32BE(4) : header.readUInt32LE(4);
+  const machine = machineFromMachO(cpuType);
+
+  return {
+    valid: true,
+    filepath,
+    absolutePath,
+    size,
+    format: 'Mach-O',
+    architecture: machine,
+    machine,
+    bits,
+    endianness: isBigEndian ? 'big' : 'little'
+  };
+}
+
+function machineFromMachO(cpuType: number): string {
+  // Mask off CPU_ARCH_ABI64 (0x01000000) for comparison
+  const baseCpuType = cpuType & ~0x01000000;
+  switch (baseCpuType) {
+    case 7:   // CPU_TYPE_X86
+      return cpuType & 0x01000000 ? 'x86_64' : 'i386';
+    case 12:  // CPU_TYPE_ARM
+      return cpuType & 0x01000000 ? 'aarch64' : 'arm';
+    case 18:  // CPU_TYPE_POWERPC
+      return cpuType & 0x01000000 ? 'ppc64' : 'ppc';
+    default:
+      return `unknown(0x${cpuType.toString(16)})`;
+  }
 }
 
 function machineFromElf(machine: number): string {
