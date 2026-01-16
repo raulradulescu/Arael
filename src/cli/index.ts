@@ -19,7 +19,7 @@ import { getCache } from '../cache/store';
 import { logger } from '../utils/logger';
 import { loadEnvFromFile } from '../utils/env';
 import { startShell } from './shell';
-import { scanWithBuiltinRules, scanWithCustomRules, isYaraInstalled, getAvailableCategories } from '../utils/yara';
+import { scan, isYaraInstalled, getAvailableCategories, getAvailableRuleSets, isRLRulesAvailable, getRLRuleStats } from '../utils/yara';
 
 loadEnvFromFile();
 
@@ -373,35 +373,72 @@ program
   });
 
 program
-  .command('yara <filepath>')
+  .command('yara [filepath]')
   .description('Scan binary with YARA rules')
-  .option('-r, --rules <file>', 'Custom YARA rules file (default: built-in rules)')
-  .option('-c, --category <cat>', 'Filter by category (packer, crypto, network, anti-debug, suspicious, ctf)')
+  .option('-r, --rules <file>', 'Custom YARA rules file')
+  .option('-s, --ruleset <set>', 'Rule set: builtin, reversinglabs, all (default: builtin)')
+  .option('-c, --category <cat>', 'Filter by category (packer, crypto, network, anti-debug, suspicious, ctf, shellcode, evasion, malware, compiler, ransomware)')
+  .option('-l, --list-rules', 'List available rule sets and categories')
   .option('-j, --json', 'Output as JSON')
-  .action(async (filepath: string, options: { rules?: string; category?: string; json?: boolean }) => {
+  .action(async (filepath: string | undefined, options: { rules?: string; ruleset?: string; category?: string; listRules?: boolean; json?: boolean }) => {
     try {
+      // List available rules
+      if (options.listRules) {
+        console.log('Available Rule Sets:\n');
+        const ruleSets = getAvailableRuleSets();
+        for (const rs of ruleSets) {
+          const status = rs.available ? `${rs.ruleCount} rules` : '(not installed)';
+          console.log(`  ${rs.name.padEnd(15)} - ${rs.description} [${status}]`);
+        }
+
+        if (isRLRulesAvailable()) {
+          console.log('\nReversingLabs Categories:');
+          const rlStats = getRLRuleStats();
+          for (const stat of rlStats) {
+            console.log(`  ${stat.category.padEnd(15)} - ${stat.count} rules`);
+          }
+        }
+
+        console.log('\nBuilt-in Categories:');
+        const categories = getAvailableCategories();
+        for (const cat of categories) {
+          console.log(`  ${cat}`);
+        }
+        return;
+      }
+
+      if (!filepath) {
+        console.error('Error: filepath is required unless --list-rules is used.');
+        process.exit(1);
+      }
+
       const yaraInstalled = await isYaraInstalled();
       if (!yaraInstalled) {
         console.log('Note: YARA not installed. Using basic pattern matching.');
         console.log('Install YARA for more accurate scanning: https://yara.readthedocs.io/\n');
       }
 
+      // Determine rule set to use
       let result;
       if (options.rules) {
+        // Custom rules file takes precedence
         if (!fs.existsSync(options.rules)) {
           console.error(`Rules file not found: ${options.rules}`);
           process.exit(1);
         }
-        result = await scanWithCustomRules(filepath, options.rules);
+        result = await scan(filepath, { customRulesPath: options.rules });
       } else {
-        result = await scanWithBuiltinRules(filepath);
+        // Use specified rule set or default to builtin
+        const ruleSet = options.ruleset || 'builtin';
+        result = await scan(filepath, { ruleSet });
       }
 
       // Filter by category if specified
       if (options.category) {
         result.matches = result.matches.filter(m =>
           m.tags.includes(options.category!) ||
-          m.rule.toLowerCase().includes(options.category!.toLowerCase())
+          m.rule.toLowerCase().includes(options.category!.toLowerCase()) ||
+          (m.meta && m.meta.category === options.category)
         );
       }
 
@@ -412,13 +449,19 @@ program
           console.log('No matches found.');
         } else {
           console.log(`Found ${result.matches.length} matches:\n`);
-          console.log(`${'Rule'.padEnd(30)} ${'Tags'.padEnd(20)} Strings`);
-          console.log('-'.repeat(70));
+          console.log(`${'Rule'.padEnd(30)} ${'Tags'.padEnd(20)} ${'Source'.padEnd(15)} Strings`);
+          console.log('-'.repeat(80));
           for (const match of result.matches) {
             const tags = match.tags.join(', ') || '-';
+            const source = match.meta?.source || 'builtin';
             const stringCount = match.strings.length > 0 ? `${match.strings.length} strings` : '-';
-            console.log(`${match.rule.padEnd(30)} ${tags.padEnd(20)} ${stringCount}`);
+            console.log(`${match.rule.padEnd(30)} ${tags.padEnd(20)} ${source.padEnd(15)} ${stringCount}`);
           }
+        }
+
+        // Show rules used
+        if (result.rulesUsed.length > 0) {
+          console.log(`\nRules used: ${result.rulesUsed.join(', ')}`);
         }
 
         if (result.errors.length > 0) {

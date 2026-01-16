@@ -4,7 +4,7 @@
 
 **Arael** is a reverse engineering assistant that bridges Ghidra with Claude Code via the Model Context Protocol (MCP). It enables LLMs to analyze binaries by invoking CLI commands and interpreting JSON output.
 
-**Current Version:** v2.3.0
+**Current Version:** v2.5.2
 **Test Status:** 131/131 tests passing
 **Stack:** TypeScript + Python (PyGhidra 3.0+)
 
