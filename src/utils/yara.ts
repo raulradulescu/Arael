@@ -622,7 +622,7 @@ async function scanWithYaraCli(binaryPath: string, rules: string, source?: strin
     rulesUsed: ['yara-cli'],
     errors: []
   };
-  const baseMeta = source ? { source } : {};
+  const baseMeta: Record<string, string> = source ? { source } : {};
 
   // Write rules to temp file
   const tempRulesPath = path.join(os.tmpdir(), `arael_yara_${Date.now()}.yar`);

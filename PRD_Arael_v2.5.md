@@ -111,7 +111,7 @@
 ```
 ✅ arael shell - Interactive analysis REPL with full command set
 ✅ arael batch - Glob pattern batch analysis with JSON output
-✅ arael yara - YARA rule scanning (built-in rules + fallback)
+✅ arael yara - YARA rule scanning (built-in + optional ReversingLabs + custom)
 ✅ arael report - HTML dark-theme reports
 ✅ ARM64/ARM32 architecture support (detection + Ghidra language IDs)
 ```
@@ -175,9 +175,94 @@
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| **YARA Scanning** | Run YARA rules against binary (built-in rulesets: packers, crypto, capabilities) | ✅ DONE |
+| **YARA Scanning** | Run YARA rules against binary with tiered rule sets (builtin, ReversingLabs, custom). Uses the ReversingLabs YARA repository for external malware family rules. | ✅ DONE |
 | **VirusTotal Lookup** | Hash lookup (optional, requires API key) | ⏸️ Future |
 | **MITRE ATT&CK Mapping** | Map imports/behaviors to ATT&CK techniques | ⏸️ Future |
+
+#### YARA Rule Sets (v2.5.x)
+
+The YARA scanning system uses a tiered architecture with three rule sources:
+
+**1. Built-in Rules (43 rules)** - Technique detection, always available, no dependencies:
+
+| Category | Rules | Description |
+|----------|-------|-------------|
+| `packer` | 9 | UPX, PyInstaller, Themida, VMProtect, MPRESS, ASPack, Enigma, ConfuserEx, PyArmor |
+| `crypto` | 8 | AES, RSA, Base64, RC4, ChaCha20, MD5, SHA256, XOR loops |
+| `network` | 2 | URLs, IP addresses |
+| `anti-debug` | 2 | ptrace (Linux), Windows debugging APIs |
+| `suspicious` | 3 | Shell commands, embedded PEs, hardcoded credentials |
+| `ctf` | 1 | Flag patterns (`FLAG{}`, `flag{}`, etc.) |
+| `shellcode` | 4 | NOP sleds, x86/x64 patterns, Metasploit payloads |
+| `evasion` | 4 | VM detection, sandbox evasion, AMSI bypass, ETW bypass |
+| `malware` | 4 | Keylogger APIs, screenshot capture, clipboard monitor, C2 beaconing |
+| `compiler` | 4 | Go, Rust, Nim, .NET signatures |
+| `ransomware` | 2 | Encrypted extensions, ransom note patterns |
+
+**2. ReversingLabs Rules (310 rules)** - Malware family detection, optional external repo:
+
+| Category | Rule Count | Description |
+|----------|------------|-------------|
+| `ransomware` | 249 | WannaCry, Locky, CryptoLocker, etc. |
+| `backdoor` | 30 | Remote access trojans |
+| `trojan` | 10 | Generic trojans |
+| `infostealer` | 8 | Credential stealers |
+| `virus` | 8 | Self-replicating malware |
+| `certificate` | 1 | Certificate-related |
+| `downloader` | 1 | Dropper/downloader |
+| `exploit` | 1 | Exploit code |
+| `pua` | 1 | Potentially unwanted |
+| `rootkit` | 1 | Rootkit signatures |
+
+**Installation:** Clone to project root:
+```bash
+git clone https://github.com/reversinglabs/reversinglabs-yara-rules reversinglabs-yara-rules-develop
+```
+
+**3. Custom Rules** - User-provided `.yar`/`.yara` files via `--rules` option.
+
+**CLI Options:**
+```bash
+arael yara [filepath] [options]
+
+Options:
+  -r, --rules <file>     Custom YARA rules file
+  -s, --ruleset <set>    Rule set: builtin, reversinglabs, all (default: builtin)
+  -c, --category <cat>   Filter by category
+  -l, --list-rules       List available rule sets and categories
+  -j, --json             Output as JSON
+```
+
+**Usage Examples:**
+```bash
+# List all available rules and categories
+arael yara --list-rules
+
+# Scan with built-in rules (default, works without YARA CLI)
+arael yara ./malware.exe
+
+# Scan with ReversingLabs rules (requires YARA CLI)
+arael yara ./malware.exe --ruleset reversinglabs
+
+# Scan with ALL rules combined
+arael yara ./malware.exe --ruleset all
+
+# Use custom rules file
+arael yara ./malware.exe --rules ./my_rules.yar
+
+# Filter by category
+arael yara ./malware.exe --category ransomware
+arael yara ./malware.exe --category packer
+arael yara ./malware.exe --ruleset reversinglabs --category backdoor
+
+# JSON output for scripting
+arael yara ./malware.exe --json
+```
+
+**Dependencies:**
+- Built-in rules: No dependencies (basic pattern matching fallback if YARA not installed)
+- ReversingLabs/Custom rules: Requires YARA CLI (`yara --version`)
+- Install YARA: https://yara.readthedocs.io/
 
 ### v2.4.0 Implementation Status
 
@@ -209,7 +294,7 @@
 │  COMPLETED (v2.5.0 - CLI Enhancement)                                       │
 │  ├─ arael shell (interactive REPL mode)                          [✅ DONE] │
 │  ├─ arael batch (glob pattern batch analysis)                    [✅ DONE] │
-│  ├─ arael yara (YARA scanning with built-in rules)               [✅ DONE] │
+│  ├─ arael yara (YARA scanning with tiered rule sets)             [✅ DONE] │
 │  ├─ arael report (HTML dark-theme output)                        [✅ DONE] │
 │  ├─ ARM64 architecture support (detection + Ghidra lang ID)      [✅ DONE] │
 │  └─ ARM32 architecture support (detection + Ghidra lang ID)      [✅ DONE] │

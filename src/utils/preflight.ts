@@ -133,25 +133,6 @@ export async function validateBinary(filepath: string): Promise<PreflightResult>
   );
 }
 
-/**
- * Quick check if a file looks like an ELF binary.
- * Does not throw, returns boolean.
- */
-export function isElfBinary(filepath: string): boolean {
-  try {
-    if (!fs.existsSync(filepath)) return false;
-
-    const fd = fs.openSync(filepath, 'r');
-    const magic = Buffer.alloc(4);
-    fs.readSync(fd, magic, 0, 4, 0);
-    fs.closeSync(fd);
-
-    return magic.equals(ELF_MAGIC);
-  } catch {
-    return false;
-  }
-}
-
 function parseElf(
   filepath: string,
   absolutePath: string,

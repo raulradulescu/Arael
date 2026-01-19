@@ -20,6 +20,10 @@ import { logger } from '../utils/logger';
 import { loadEnvFromFile } from '../utils/env';
 import { startShell } from './shell';
 import { scan, isYaraInstalled, getAvailableCategories, getAvailableRuleSets, isRLRulesAvailable, getRLRuleStats } from '../utils/yara';
+import { extractIOCs, countIOCs } from '../analysis/ioc-extractor';
+import { detectBehaviors, assessBehaviorRisk, classifyBinaryType } from '../analysis/behavior-detector';
+import { mapToATTACK } from '../analysis/mitre-mapper';
+import { assessImportRisk } from '../analysis/import-database';
 
 loadEnvFromFile();
 
@@ -54,6 +58,168 @@ program
       const result = await analyzeHandler({ filepath, force: options.force });
 
       outputResult(result, options.output);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('context <filepath>')
+  .description('Generate LLM-optimized analysis context (v2.6)')
+  .option('-j, --json', 'Output as JSON')
+  .option('--focus <area>', 'Focus area: security, functionality, all', 'all')
+  .option('--include-code', 'Include pseudocode for key functions')
+  .action(async (filepath: string, options: { json?: boolean; focus?: string; includeCode?: boolean }) => {
+    try {
+      await initConnection();
+      logger.userMessage('Generating LLM context (analyzing binary)...');
+      const result = await analyzeHandler({ filepath });
+
+      // Extract data for analysis
+      const importNames = result.imports.map(i => i.name);
+      const stringValues = result.strings.map(s => s.value);
+
+      // Run v2.6 analysis modules
+      const behaviors = detectBehaviors(importNames, stringValues);
+      const behaviorRisk = assessBehaviorRisk(behaviors);
+      const classification = classifyBinaryType(behaviors);
+      const iocs = extractIOCs(stringValues);
+      const mitreMapping = mapToATTACK(behaviors);
+      const importRisk = assessImportRisk(importNames);
+
+      // Build LLM context
+      const context = {
+        summary: generateContextSummary(result, classification, behaviorRisk),
+        classification: {
+          type: classification.classification,
+          malwareType: classification.malwareType,
+          confidence: classification.confidence,
+          reasoning: classification.reasoning,
+        },
+        binary: {
+          filename: result.binary.filename,
+          format: result.binary.format,
+          architecture: result.binary.architecture,
+          bits: result.binary.bits,
+          size: result.binary.size,
+          isPacked: result.binary.packing?.isPacked ?? false,
+          entropy: result.binary.packing?.entropy?.overall,
+        },
+        behaviors: behaviors.map(b => ({
+          id: b.id,
+          category: b.category,
+          description: b.description,
+          riskLevel: b.riskLevel,
+          evidence: b.evidence.slice(0, 5),
+        })),
+        riskAssessment: {
+          overall: behaviorRisk.overallRisk,
+          importRisk: importRisk.overallRisk,
+          criticalBehaviors: behaviorRisk.criticalBehaviors,
+        },
+        iocs: {
+          ips: iocs.ips,
+          domains: iocs.domains,
+          urls: iocs.urls,
+          registryKeys: iocs.registryKeys,
+          filePaths: iocs.filePaths.slice(0, 10),
+        },
+        mitreAttack: {
+          tactics: mitreMapping.tactics,
+          techniques: mitreMapping.techniques.slice(0, 10).map(t => ({
+            id: t.id,
+            name: t.name,
+            confidence: t.confidence,
+          })),
+          summary: mitreMapping.summary,
+        },
+        keyFunctions: result.functions
+          .filter(f => !f.isThunk && !f.isExternal)
+          .sort((a, b) => b.size - a.size)
+          .slice(0, 15)
+          .map(f => ({
+            name: f.name,
+            address: f.address,
+            size: f.size,
+          })),
+        suggestedAnalysis: generateSuggestedAnalysis(behaviors, iocs, classification),
+        stats: {
+          functions: result.functions.length,
+          strings: result.strings.length,
+          imports: result.imports.length,
+          behaviorsDetected: behaviors.length,
+          iocsFound: countIOCs(iocs),
+          techniquesMatched: mitreMapping.techniques.length,
+        },
+      };
+
+      if (options.json) {
+        console.log(JSON.stringify(context, null, 2));
+      } else {
+        // Human-readable output
+        console.log('\n' + '='.repeat(70));
+        console.log('ARAEL CONTEXT ANALYSIS (v2.6)');
+        console.log('='.repeat(70));
+
+        console.log(`\nBinary: ${context.binary.filename}`);
+        console.log(`Format: ${context.binary.format} ${context.binary.architecture} (${context.binary.bits}-bit)`);
+        console.log(`Size: ${(context.binary.size / 1024).toFixed(1)} KB`);
+        if (context.binary.isPacked) console.log(`Packing: PACKED (entropy: ${context.binary.entropy?.toFixed(2)})`);
+
+        console.log('\n--- CLASSIFICATION ---');
+        console.log(`Type: ${context.classification.type.toUpperCase()}${context.classification.malwareType ? ` (${context.classification.malwareType})` : ''}`);
+        console.log(`Confidence: ${(context.classification.confidence * 100).toFixed(0)}%`);
+        console.log(`Reasoning: ${context.classification.reasoning.join('; ')}`);
+
+        console.log('\n--- SUMMARY ---');
+        console.log(context.summary);
+
+        console.log('\n--- RISK ASSESSMENT ---');
+        console.log(`Overall Risk: ${context.riskAssessment.overall.toUpperCase()}`);
+        console.log(`Import Risk: ${context.riskAssessment.importRisk}`);
+        if (context.riskAssessment.criticalBehaviors.length > 0) {
+          console.log(`Critical: ${context.riskAssessment.criticalBehaviors.join('; ')}`);
+        }
+
+        if (context.behaviors.length > 0) {
+          console.log('\n--- BEHAVIORS DETECTED ---');
+          for (const b of context.behaviors.slice(0, 8)) {
+            const icon = b.riskLevel === 'critical' ? '!!' : b.riskLevel === 'high' ? '!' : '-';
+            console.log(`[${icon}] ${b.description} (${b.category})`);
+          }
+        }
+
+        if (context.mitreAttack.techniques.length > 0) {
+          console.log('\n--- MITRE ATT&CK ---');
+          console.log(`Tactics: ${context.mitreAttack.tactics.join(', ')}`);
+          console.log('Techniques:');
+          for (const t of context.mitreAttack.techniques.slice(0, 6)) {
+            console.log(`  ${t.id}: ${t.name} (${(t.confidence * 100).toFixed(0)}%)`);
+          }
+        }
+
+        const hasIOCs = context.iocs.ips.length || context.iocs.domains.length || context.iocs.urls.length;
+        if (hasIOCs) {
+          console.log('\n--- IOCs ---');
+          if (context.iocs.urls.length) console.log(`URLs: ${context.iocs.urls.join(', ')}`);
+          if (context.iocs.ips.length) console.log(`IPs: ${context.iocs.ips.join(', ')}`);
+          if (context.iocs.domains.length) console.log(`Domains: ${context.iocs.domains.join(', ')}`);
+          if (context.iocs.registryKeys.length) console.log(`Registry: ${context.iocs.registryKeys.slice(0, 3).join(', ')}`);
+        }
+
+        console.log('\n--- SUGGESTED ANALYSIS ---');
+        for (const step of context.suggestedAnalysis) {
+          console.log(`  * ${step}`);
+        }
+
+        console.log('\n--- STATS ---');
+        console.log(`Functions: ${context.stats.functions} | Strings: ${context.stats.strings} | Imports: ${context.stats.imports}`);
+        console.log(`Behaviors: ${context.stats.behaviorsDetected} | IOCs: ${context.stats.iocsFound} | ATT&CK: ${context.stats.techniquesMatched}`);
+
+        console.log('\n' + '='.repeat(70));
+        console.log('Use --json for full machine-readable output');
+      }
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : error}`);
       process.exit(1);
@@ -718,6 +884,67 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function generateContextSummary(
+  result: import('../output/schema').AnalysisResult,
+  classification: { classification: string; malwareType?: string; confidence: number },
+  risk: { overallRisk: string; criticalBehaviors: string[] }
+): string {
+  const format = `${result.binary.format} ${result.binary.architecture} ${result.binary.bits}-bit`;
+  const packed = result.binary.packing?.isPacked ? 'packed ' : '';
+
+  if (classification.classification === 'malware') {
+    const type = classification.malwareType ?? 'malicious';
+    return `${packed}${format} executable classified as ${type} with ${(classification.confidence * 100).toFixed(0)}% confidence. ${risk.criticalBehaviors.length > 0 ? `Critical behaviors: ${risk.criticalBehaviors.slice(0, 2).join(', ')}.` : ''}`;
+  } else if (classification.classification === 'suspicious') {
+    return `${packed}${format} executable with suspicious characteristics. Risk level: ${risk.overallRisk}. Requires further analysis to confirm malicious intent.`;
+  } else {
+    return `${packed}${format} executable with ${result.functions.length} functions and ${result.imports.length} imports. No obvious malicious indicators detected.`;
+  }
+}
+
+function generateSuggestedAnalysis(
+  behaviors: Array<{ id: string; category: string; evidence: string[] }>,
+  iocs: { urls: string[]; ips: string[]; registryKeys: string[] },
+  classification: { classification: string; malwareType?: string }
+): string[] {
+  const suggestions: string[] = [];
+
+  if (classification.classification === 'malware' || classification.classification === 'suspicious') {
+    suggestions.push('Examine network-related functions for C2 communication patterns');
+  }
+
+  if (behaviors.some(b => b.id === 'process_injection')) {
+    suggestions.push('Analyze injection target selection and payload in WriteProcessMemory calls');
+  }
+
+  if (behaviors.some(b => b.id === 'persistence_registry')) {
+    suggestions.push('Check registry key values for persistence payload paths');
+  }
+
+  if (iocs.urls.length > 0) {
+    suggestions.push(`Investigate URLs: ${iocs.urls.slice(0, 2).join(', ')}`);
+  }
+
+  if (behaviors.some(b => b.id === 'credential_theft')) {
+    suggestions.push('Examine credential access functions for targeted applications');
+  }
+
+  if (behaviors.some(b => b.id === 'file_encryption')) {
+    suggestions.push('Analyze encryption routine and look for ransom note generation');
+  }
+
+  if (behaviors.some(b => b.category === 'defense_evasion')) {
+    suggestions.push('Review anti-analysis checks for sandbox/VM detection logic');
+  }
+
+  if (suggestions.length === 0) {
+    suggestions.push('Review main entry point and initialization routines');
+    suggestions.push('Examine string references for configuration data');
+  }
+
+  return suggestions.slice(0, 6);
 }
 
 program.parse();

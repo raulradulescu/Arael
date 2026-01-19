@@ -2,122 +2,121 @@
 
 **Reverse Engineering Assistant for Cybersecurity Professionals**
 
-[![Tests](https://img.shields.io/badge/tests-271%20total-brightgreen)]()
+[![Version](https://img.shields.io/badge/version-2.6.0-blue)]()
+[![Tests](https://img.shields.io/badge/tests-271%20passing-brightgreen)]()
 [![Ghidra](https://img.shields.io/badge/Ghidra-12.0-blue)]()
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)]()
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)]()
-[![npm](https://img.shields.io/badge/npm-ready-green)]()
 
-Arael is an MCP (Model Context Protocol) server that bridges Ghidra's powerful binary analysis capabilities with Claude Code. It enables AI-assisted reverse engineering by exposing decompilation, disassembly, and binary analysis through structured JSON APIs.
+Arael is an MCP (Model Context Protocol) server that bridges Ghidra's binary analysis with Claude Code. It enables AI-assisted reverse engineering through structured JSON APIs.
 
 > **Bachelor's Thesis Project for 2026 by Raul Radulescu**
-> **Status:** Phase 1 & 2 Complete ✅ | MVP Functional 🚀
 
 ---
 
-## ✨ **What's New in v2.5**
+## What's New in v2.6
 
-- **Interactive Shell**: `arael shell ./binary` - Full REPL with decompile, disasm, xrefs, callgraph, hexdump
-- **Batch Analysis**: `arael batch ./samples/*.exe` - Analyze multiple binaries with glob patterns
-- **YARA Scanning**: `arael yara ./binary` - Built-in rules for packers, crypto, network, anti-debug
-- **HTML Reports**: `arael report ./binary` - Professional dark-theme analysis reports
-- **ARM Support**: ARM64/ARM32 architecture detection and Ghidra language mapping
+### LLM Context Layer
+- **`arael context`**: LLM-optimized analysis with classification, behaviors, and IOCs
+- **Behavior Detection**: 25+ rules detecting network, injection, credential theft, ransomware patterns
+- **MITRE ATT&CK Mapping**: 36 techniques mapped with confidence scores
+- **IOC Extraction**: IPs, domains, URLs, registry keys, file paths, mutexes
+- **Binary Classification**: Benign/suspicious/malware with type detection (trojan, stealer, rat, etc.)
+- **Import Database**: 483 functions with capability categories and risk levels
 
-### Previous: v2.4
+```bash
+# Get LLM-optimized context
+arael context ./malware.exe
 
-- **New MCP tools**: disassemble, xrefs, exports, and call graph (JSON/DOT/Mermaid)
-- **Packing + section heuristics**: entropy checks, packer signatures, RWX/high-entropy flags
-- **Import enrichment**: capability tagging + risk levels in analysis output
-- **x86 expansion**: 32-bit and 16-bit (MZ/COM/boot sector) load hints
-- **Utility upgrades**: system strings fallback and PyInstaller/UPX helpers
+# JSON output for programmatic use
+arael context ./binary --json
+```
+
+**Output includes:**
+- Classification with confidence and reasoning
+- Detected behaviors with evidence
+- MITRE ATT&CK techniques and tactics
+- Extracted IOCs
+- Risk assessment
+- Suggested analysis steps
+
+### Previous: v2.5
+- Interactive Shell: `arael shell ./binary`
+- Batch Analysis: `arael batch ./samples/*.exe`
+- YARA Scanning: 43 built-in + 310 ReversingLabs rules
+- HTML Reports: `arael report ./binary`
+- ARM64/ARM32 support
 
 ---
 
 ## Features
 
 ### Core Analysis
-- **Full Binary Analysis**: ELF/PE/Mach-O/MZ/COM/RAW via Ghidra 12.0
-- **Decompilation**: C pseudocode per function (PyGhidra 3.0)
-- **Disassembly**: Function or address-range instruction listings
-- **Function Listing**: Filters by name/size, optional thunk/external filters
-- **String Extraction**: Encoding-aware strings with optional system `strings` fallback
-- **Import + Export Listing**: Imports categorized by capability/risk, exports supported
-- **Cross-References**: Xrefs to/from specific addresses
-- **Call Graphs**: JSON/DOT/Mermaid graph output
-- **Hexdump**: VA-aware dump with ELF segment mapping
-- **Smart Caching**: SQLite cache keyed by SHA-256
+| Command | Description | Output |
+|---------|-------------|--------|
+| `analyze` | Full Ghidra analysis | JSON: binary, functions[], strings[], imports[], exports[] |
+| `context` | LLM-optimized context (v2.6) | JSON: classification, behaviors[], mitreAttack{}, iocs{}, riskAssessment |
+| `functions` | List functions | JSON array: name, address, size |
+| `decompile` | C pseudocode | String: decompiled code |
+| `disassemble` | Assembly listing | JSON array: instructions |
+| `strings` | Extract strings | JSON array: value, address, xrefs[] |
+| `imports` | Import analysis | JSON: by library with categories, risk levels |
+| `exports` | Export listing | JSON array: name, address, type |
+| `xrefs` | Cross-references | JSON array: from/to address, type |
+| `callgraph` | Call graph | JSON/DOT/Mermaid |
+| `hexdump` | Byte dump | Formatted hex/ASCII |
+| `yara` | Pattern scanning | JSON: rule matches |
+| `shell` | Interactive REPL | Commands: decompile, disasm, xrefs, etc. |
+| `batch` | Multi-binary analysis | JSON files per binary |
+| `report` | HTML report | Standalone HTML |
 
-### Security/Heuristics
-- **Packing detection**: entropy + packer signatures (UPX, PyInstaller, Themida, etc.)
-- **Section analysis**: RWX and high-entropy anomalies
-- **Import risk tagging**: network/crypto/process/file I/O capability labels
+### Security Analysis (v2.6)
+- **Behavior Detection**: Network client/server, process injection, credential theft, persistence, anti-debug, keylogging, file encryption
+- **MITRE ATT&CK**: T1055 (Injection), T1547.001 (Registry Run Keys), T1071 (C2), T1486 (Ransomware), T1555 (Credentials), etc.
+- **IOC Extraction**: IPv4/IPv6, domains, URLs, emails, file paths, registry keys, mutexes, user agents
+- **Import Risk**: 483 functions categorized (Network, Crypto, Process, Injection, AntiDebug, Persistence)
+- **Packing Detection**: UPX, PyInstaller, Themida, VMProtect + entropy analysis
 
 ### Multi-Format Support
-| Format | Status | Notes |
-|--------|--------|-------|
-| ELF | ✅ Fully Supported | x86_64, x86, ARM64, ARM32 |
-| PE  | ✅ Tested | 32/64-bit Windows executables |
-| Mach-O | ✅ Tested | macOS binaries |
-| MZ/COM/RAW | ✅ Supported | 16-bit DOS/boot images with load hints |
-| ARM64 | ✅ Supported | macOS Apple Silicon, Android, IoT |
-| ARM32 | ✅ Supported | Embedded, IoT, Android |
+| Format | Architectures |
+|--------|---------------|
+| ELF | x86_64, x86, ARM64, ARM32, MIPS, RISC-V |
+| PE | x86_64, x86, ARM64, ARM32 |
+| Mach-O | x86_64, ARM64 (Apple Silicon) |
+| MZ/COM/RAW | 16-bit DOS, boot sectors |
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
-
-- **Node.js** 20+
-- **Python** 3.10+ (with pyghidra)
-- **Java** 17+
-- **Ghidra** 12.0+ (release install or snap, not source tree)
+- Node.js 20+, Python 3.10+, Java 17+, Ghidra 12.0+
 
 ### Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/raulradulescu/arael.git
 cd arael
 
-# Optional: create a local venv for PyGhidra
+# Python setup
 python3 -m venv .venv
-source .venv/bin/activate
-# On Windows: .venv\\Scripts\\activate
-
-# Install Python dependencies (PyGhidra)
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install pyghidra
 
-# Install Node dependencies
+# Node setup
 npm install
 
-# Configure environment
-cat > .env <<'EOF'
-# WSL
-GHIDRA_PATH="/path/to/ghidra_12.0_PUBLIC"
-ARAEL_PYTHON="/path/to/arael/.venv/bin/python"
-
-# Windows
-GHIDRA_PATH="C:\\path\\to\\ghidra_12.0_PUBLIC"
-ARAEL_PYTHON="C:\\Python311\\python.exe"
-EOF
-
-# The loader auto-selects the WSL/Windows block based on your platform.
-# Optional:
-#   ARAEL_USE_SYSTEM_STRINGS=1
-#   ARAEL_STRINGS_GREP="FLAG|password"
+# Configure .env
+echo 'GHIDRA_PATH="/path/to/ghidra_12.0_PUBLIC"' > .env
+echo 'ARAEL_PYTHON="/path/to/.venv/bin/python"' >> .env
 
 # Build
 npm run build
-
-# Run tests
-npm test
 ```
 
 ### Configure Claude Code
 
 Add to `~/.config/claude-code/mcp.json`:
-
 ```json
 {
   "servers": {
@@ -125,7 +124,7 @@ Add to `~/.config/claude-code/mcp.json`:
       "command": "node",
       "args": ["/path/to/arael/dist/mcp/server.js"],
       "env": {
-        "GHIDRA_PATH": "/path/to/ghidra_12.0_PUBLIC",
+        "GHIDRA_PATH": "/path/to/ghidra",
         "ARAEL_PYTHON": "/path/to/python"
       }
     }
@@ -135,392 +134,144 @@ Add to `~/.config/claude-code/mcp.json`:
 
 ---
 
-## 📖 Usage Examples
+## Usage
 
-### CLI Usage
+### CLI
 
 ```bash
-# Full analysis
-arael analyze ./malware.exe
+# v2.6: LLM Context (recommended starting point)
+arael context ./binary              # Human-readable
+arael context ./binary --json       # Machine-readable
 
-# List functions matching pattern
-arael functions ./binary --filter "^main\."
-
-# Decompile by name or address
-arael decompile ./binary --function validate_password
-arael decompile ./binary --address 0x140001450
-
-# Disassemble a function
+# Core analysis
+arael analyze ./binary
+arael functions ./binary --filter "^main"
+arael decompile ./binary --function main
 arael disassemble ./binary --function main
 
-# Extract strings
+# Data extraction
 arael strings ./binary --min-length 6
-
-# List imports with capability detection
 arael imports ./binary
-
-# List exports
 arael exports ./binary
 
-# Cross-references
-arael xrefs ./binary --address 0x401000 --direction both
-
-# Call graph generation
+# Flow analysis
+arael xrefs ./binary --address 0x401000
 arael callgraph ./binary --format mermaid --root main
 
-# Hexdump with address translation
+# Utilities
 arael hexdump ./binary --address 0x401000 --length 128
+arael yara ./binary
+arael report ./binary --output report.html
 
-# Cache management
-arael cache --stats
-arael cache --clear
+# Interactive
+arael shell ./binary
+arael batch "./samples/*.exe" --output ./results
 ```
 
-### New in v2.5: Interactive & Batch
+### MCP Tools
 
-```bash
-# Interactive shell (REPL mode)
-arael shell ./binary
-# Commands: help, info, functions, strings, imports, exports,
-#           decompile <func>, disasm <func>, xrefs <addr>,
-#           callgraph [func], hexdump <addr>, load <file>, exit
+```python
+# LLM-optimized context (v2.6)
+context = await arael_context({"filepath": "./binary"})
+# Returns: classification, behaviors, iocs, mitreAttack, riskAssessment
 
-# Batch analysis with glob patterns
-arael batch "./samples/*.exe" --output ./results
+# Full analysis
+result = await arael_analyze({"filepath": "./binary"})
 
-# YARA scanning with built-in rules
-arael yara ./binary
-# Detects: packers (UPX, PyInstaller, VMProtect), crypto, network, anti-debug
+# Decompile
+code = await arael_decompile({"filepath": "./binary", "function": "main"})
 
-# Generate HTML analysis report
-arael report ./binary --output report.html
+# Cross-references
+xrefs = await arael_xrefs({"filepath": "./binary", "address": "0x401000"})
 ```
 
 ### Slash Commands (Claude Code)
 
-| Command | Usage | Description |
-|---------|-------|-------------|
-| `/arael` | `/arael ./binary` | Full binary analysis |
-| `/decompile` | `/decompile main` | Get C pseudocode |
-| `/disasm` | `/disasm 0x401000` | Get assembly |
-| `/xrefs` | `/xrefs decrypt` | Cross-references |
-| `/callgraph` | `/callgraph main` | Call graph |
-| `/strings` | `/strings flag` | Search strings |
-| `/imports` | `/imports` | List imports |
-| `/hexdump` | `/hexdump 0x401000` | Raw bytes |
+| Command | Description |
+|---------|-------------|
+| `/arael` | Full binary analysis |
+| `/decompile` | Decompile function |
+| `/disasm` | Disassemble |
+| `/xrefs` | Cross-references |
+| `/callgraph` | Call graph |
+| `/strings` | Search strings |
+| `/imports` | List imports |
+| `/hexdump` | Raw bytes |
 
-### MCP Tools (via Claude Code)
+---
 
-```python
-# Analyze a binary
-result = await arael_analyze({
-    "filepath": "./suspicious.exe"
-})
+## YARA Scanning
 
-# Decompile a function
-code = await arael_decompile({
-    "filepath": "./binary",
-    "function": "main"
-})
+| Rule Set | Rules | Description |
+|----------|-------|-------------|
+| builtin | 43 | Packers, crypto, shellcode, evasion |
+| reversinglabs | 310 | Malware families (optional) |
+| all | 353 | Combined |
 
-# Search for functions
-funcs = await arael_functions({
-    "filepath": "./binary",
-    "filter": { "namePattern": "crypto|aes|encrypt" }
-})
-
-# Cross-references and call graph
-xrefs = await arael_xrefs({
-    "filepath": "./binary",
-    "address": "0x401000",
-    "direction": "to"
-})
-
-graph = await arael_callgraph({
-    "filepath": "./binary",
-    "format": "dot"
-})
+```bash
+arael yara ./binary                      # Built-in rules
+arael yara ./binary --ruleset all        # All rules
+arael yara ./binary --category ransomware
 ```
 
 ---
 
-## 🐍 Python Analysis Scripts
-
-### General Analysis
-
-**`analyze_binary.py`** - Comprehensive report
-```bash
-python scripts/analyze_binary.py analysis.json
-```
-Shows: metadata, statistics, language detection, top functions, security findings
-
-**`generate_report.py`** - HTML report generator
-```bash
-python scripts/generate_report.py analysis.json report.html
-```
-Creates professional HTML report with dark theme
-
-### Search & Discovery
-
-**`search_functions.py`** - Function search
-```bash
-# Search by pattern
-python scripts/search_functions.py analysis.json "validate|check"
-
-# Show full decompilation
-python scripts/search_functions.py analysis.json "^main\.main$" --detail
-```
-
-**`search_strings.py`** - String search
-```bash
-# Find flags/secrets
-python scripts/search_strings.py analysis.json "FLAG|password|key"
-
-# Categorize results
-python scripts/search_strings.py analysis.json "error" --categorize
-```
-
-**`decompile_function.py`** - Extract function code
-```bash
-# By name
-python scripts/decompile_function.py analysis.json validate_password
-
-# By address
-python scripts/decompile_function.py analysis.json 0x140001450 --output func.c
-```
-
-### Security Analysis
-
-**`analyze_imports.py`** - Import analysis & capability detection
-```bash
-# Basic analysis
-python scripts/analyze_imports.py analysis.json
-
-# Detect capabilities (Network, Crypto, File I/O, etc.)
-python scripts/analyze_imports.py analysis.json --capabilities
-
-# Export to CSV
-python scripts/analyze_imports.py analysis.json --csv imports.csv
-```
-
-### CTF & Challenges
-
-**`extract_flag_memory_minder.py`** - CTF flag extractor
-```bash
-python scripts/extract_flag_memory_minder.py memory_minder_analysis.json
-```
-Automatically extracts flags from memory_minder-style challenges
-
-### Binary Comparison
-
-**`diff_binaries.py`** - Compare two versions
-```bash
-python scripts/diff_binaries.py old_version.json new_version.json
-```
-Shows added/removed/modified functions, strings, and imports
-
----
-
-## 🎮 Real-World Examples
-
-### Example 1: C Binary with Secrets
+## Development
 
 ```bash
-# Analyze
-GHIDRA_PATH="..." python dist/ghidra/scripts/run_analysis.py \
-    tests/fixtures/complex_example.exe \
-    /tmp/complex_analysis.json
-
-# Find secrets
-python scripts/search_strings.py /tmp/complex_analysis.json "FLAG|password|secret"
-```
-
-**Results:**
-```
-[0x140005097] "FLAG{test_secret_123}"
-[0x1400050d4] "super_secret_password"
-```
-
-### Example 2: Go Binary CTF Challenge
-
-```bash
-# Analyze 2.5 MB Go binary
-GHIDRA_PATH="..." python dist/ghidra/scripts/run_analysis.py \
-    tests/fixtures/memory_minder \
-    /tmp/memory_minder_analysis.json
-
-# Extract flag
-python scripts/extract_flag_memory_minder.py /tmp/memory_minder_analysis.json
-```
-
-**Results:**
-```
-Found 28 rune structures!
-🚩 FLAG: HTB{M3M0RY_R3W1D_SNOWGL0B3}
-```
-
----
-
-## MCP Tools Reference
-
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `arael_analyze` | Full binary analysis | `filepath`, `force?` |
-| `arael_decompile` | Decompile function | `filepath`, `function` |
-| `arael_disassemble` | Disassemble function or range | `filepath`, `function?`, `startAddress?`, `length?` |
-| `arael_xrefs` | Cross-references to/from address | `filepath`, `address`, `direction?`, `maxResults?` |
-| `arael_functions` | List functions | `filepath`, `filter?` |
-| `arael_strings` | Extract strings | `filepath`, `minLength?`, `encoding?` |
-| `arael_imports` | List imports | `filepath` |
-| `arael_exports` | List exports | `filepath`, `filter?` |
-| `arael_callgraph` | Call graph (JSON/DOT/Mermaid) | `filepath`, `format?`, `rootFunction?`, `maxDepth?` |
-| `arael_hexdump` | Raw byte dump | `filepath`, `start`, `length?`, `width?` |
-
----
-
-## 🧪 Development
-
-### Running Tests
-
-```bash
-# All tests (unit + integration)
-npm test
-
-# Unit tests only
-npm run test:unit
-
-# Integration tests only
+npm test              # All tests
+npm run test:unit     # Unit only
 npm run test:integration
-
-# With coverage
 npm run test:coverage
-
-# Connection test (validates Ghidra setup)
-npm run test:connection
 ```
 
 ### Project Structure
-
 ```
 arael/
 ├── src/
-│   ├── cli/           # CLI entry points
-│   ├── mcp/           # MCP server & handlers (analyze, decompile, disassemble, xrefs, callgraph, exports)
-│   ├── ghidra/        # Ghidra integration
-│   │   ├── scripts/   # PyGhidra scripts (run_analysis, disassemble, xrefs, exports, callgraph)
-│   │   ├── bridge.ts  # ghidra-bridge (optional)
-│   │   ├── headless.ts # PyGhidra headless mode
-│   │   └── connection.ts # Connection manager
-│   ├── cache/         # SQLite caching
-│   ├── output/        # Schema & builders
-│   └── utils/         # Preflight, packing, sections, import-analysis, pyc-decompiler
+│   ├── analysis/     # v2.6: behavior-detector, ioc-extractor, mitre-mapper, import-database
+│   ├── cli/          # CLI commands including context
+│   ├── mcp/          # MCP server & handlers
+│   ├── ghidra/       # Ghidra integration
+│   ├── cache/        # SQLite caching
+│   └── utils/        # Packing, preflight, YARA
 ├── tests/
-│   ├── unit/          # Unit tests
-│   ├── integration/   # Integration tests
-│   └── fixtures/      # Test binaries
-├── scripts/           # Python analysis helpers
-└── docs/              # Documentation
+└── docs/             # LOCAL_LLM_PROMPT.md/.xml
 ```
 
-### Technology Stack
+---
 
-- **Runtime:** Node.js 20+ + TypeScript 5.9
-- **Analysis:** Ghidra 12.0 + PyGhidra 3.0
-- **Cache:** SQLite (better-sqlite3)
-- **Testing:** Jest 29.7 (271 tests: 168 integration + 103 unit)
-- **Python:** 3.10+ (venv recommended for PyGhidra)
+## Documentation
+
+- [Installation Guide](docs/INSTALLATION.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Local LLM Integration](docs/LOCAL_LLM_PROMPT.md) - System prompts for Ollama/llama.cpp
+- [PRD v2.6](docs/PRD_Arael_v2.6.md) - Product requirements
 
 ---
 
-## 📚 Documentation
+## Roadmap
 
-- [Installation Guide](docs/INSTALLATION.md) - Detailed setup instructions
-- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
-- [Local LLM Integration](docs/LOCAL_LLM.md) - Use with Ollama/LM Studio
-- [PRD v2.5](PRD_Arael_v2.5.md) - Product requirements & implementation status
+### ✅ Complete
+- **Phase 1-2**: Foundation, PyGhidra, core tools
+- **Phase 3**: Advanced tools (xrefs, callgraph, disassemble)
+- **Phase 4**: Packing detection, import categorization
+- **Phase 5**: x86 16/32-bit, .pyc decompilation
+- **Phase 6**: Interactive shell, batch, YARA, reports, ARM
+- **Phase 7**: LLM Context Layer (v2.6) - context command, behaviors, MITRE, IOCs
 
----
-
-## 🎯 Roadmap
-
-### ✅ Phase 1: Foundation (Complete)
-- Project scaffold with TypeScript & Jest
-- PyGhidra 3.0 integration (Ghidra 12.0+)
-- Headless mode with run_analysis.py
-- SQLite cache implementation
-- Preflight validation (ELF/PE/Mach-O)
-
-### ✅ Phase 2: Core Tools (Complete)
-- `arael_analyze`, `arael_functions`, `arael_decompile`
-- `arael_strings`, `arael_imports`, `arael_hexdump`
-
-### ✅ Phase 3: Advanced Tools (Complete)
-- `arael_disassemble`, `arael_xrefs`, `arael_exports`, `arael_callgraph`
-- Packing detection (UPX, PyInstaller, 10+ signatures)
-- Section analysis (entropy, RWX anomalies)
-- Import categorization (12 capability categories)
-
-### ✅ Phase 4: Polish & Docs (Complete)
-- Comprehensive error messages
-- INSTALLATION.md, TROUBLESHOOTING.md, LOCAL_LLM.md
-- .env configuration support
-
-### ✅ Phase 5: Architecture & Bytecode (Complete)
-- x86 32-bit architecture support
-- x86 16-bit architecture support (DOS/real mode)
-- .pyc decompilation (pycdc + uncompyle6 + marshal/dis)
-
-### ✅ Phase 6: CLI Enhancement (Complete - v2.5)
-- Interactive shell (`arael shell`) - Full REPL mode
-- Batch analysis (`arael batch`) - Glob pattern support
-- YARA scanning (`arael yara`) - Built-in detection rules
-- HTML reports (`arael report`) - Dark theme output
-- ARM64/ARM32 architecture support
-
-### ⏳ Phase 7: Thesis Enhancement (Planned)
-- `arael benchmark` - Performance evaluation
-- `arael ask` - LLM-assisted analysis
-- `arael vulnscan` - Vulnerability detection
-- `arael diff` - Binary comparison
+### ⏳ Planned
+- **Phase 8**: `arael ask` - Natural language queries with LLM providers
 
 ---
 
-## 🏆 Achievements
+## Acknowledgments
 
-- **Extensive Test Coverage** (168 integration + 103 unit tests)
-- **Multi-Format Support** (ELF, PE, Mach-O, MZ/COM/RAW, ARM)
-- **Expanded MCP Surface** (10 tools including callgraph/xrefs/disassemble/exports)
-- **Interactive REPL** (Full shell mode with all analysis commands)
-- **YARA Integration** (Built-in rules for malware/packer detection)
-- **CTF Proven** (Successfully solved memory_minder, chekhov)
-
----
-
-## 🤝 Contributing
-
-Contributions welcome! This is a thesis project but community improvements are appreciated.
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass (`npm test`)
-5. Submit a pull request
-
----
-
-## 📝 License
-
-MIT
-
----
-
-## 🙏 Acknowledgments
-
-- **Ghidra** by NSA for the incredible reverse engineering framework
+- **Ghidra** by NSA
 - **PyGhidra** for Python integration
-- **Claude AI** for development assistance
-- **HackTheBox** for the memory_minder challenge
+- **ReversingLabs** for [YARA rules](https://github.com/reversinglabs/reversinglabs-yara-rules)
+- **MITRE ATT&CK** for technique framework
 
 ---
 
-**Built with ❤️ for the cybersecurity community**
+**MIT License** | Built for the cybersecurity community

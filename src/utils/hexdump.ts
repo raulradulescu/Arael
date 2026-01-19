@@ -50,22 +50,6 @@ export function hexdump(
 }
 
 /**
- * Convert a hex string to bytes.
- */
-export function hexToBytes(hex: string): Buffer {
-  const clean = hex.replace(/\s+/g, '');
-  if (clean.length % 2 !== 0) {
-    throw new Error('Invalid hex string: odd length');
-  }
-
-  const bytes = Buffer.alloc(clean.length / 2);
-  for (let i = 0; i < clean.length; i += 2) {
-    bytes[i / 2] = parseInt(clean.substring(i, i + 2), 16);
-  }
-  return bytes;
-}
-
-/**
  * Convert bytes to a compact hex string.
  */
 export function bytesToHex(buffer: Buffer, separator = ' '): string {

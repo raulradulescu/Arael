@@ -1,8 +1,5 @@
-import { getCache } from '../../cache/store';
-import { validateBinary } from '../../utils/preflight';
+import { createDataHandler } from '../../utils/handler-utils';
 import { FunctionInfo } from '../../output/schema';
-import { analyzeHandler } from './analyze';
-import { logger } from '../../utils/logger';
 
 export interface FunctionsFilter {
   namePattern?: string;
@@ -26,53 +23,29 @@ export interface FunctionSummary {
   isExternal: boolean;
 }
 
+// Create handler using factory
+const baseFunctionsHandler = createDataHandler<FunctionInfo, FunctionsArgs>(
+  (result) => result.functions,
+  (functions, args) => {
+    const filter = args.filter;
+    if (!filter) return functions;
+
+    const regex = filter.namePattern ? new RegExp(filter.namePattern) : null;
+
+    return functions.filter((f) =>
+      (!regex || regex.test(f.name)) &&
+      (filter.minSize === undefined || f.size >= filter.minSize) &&
+      (filter.maxSize === undefined || f.size <= filter.maxSize) &&
+      (!filter.excludeThunks || !f.isThunk) &&
+      (!filter.excludeExternal || !f.isExternal)
+    );
+  }
+);
+
 export async function functionsHandler(args: FunctionsArgs): Promise<FunctionSummary[]> {
-  const { filepath, filter } = args;
+  const functions = await baseFunctionsHandler(args);
 
-  // Validate binary
-  await validateBinary(filepath);
-
-  // Get or create analysis
-  const cache = getCache();
-  let functions: FunctionInfo[];
-
-  const cached = cache.get(filepath);
-  if (cached) {
-    functions = cached.functions;
-  } else {
-    logger.info('No cache found, running analysis', { filepath });
-    const result = await analyzeHandler({ filepath });
-    functions = result.functions;
-  }
-
-  // Apply filters
-  let filtered = functions;
-
-  if (filter) {
-    if (filter.namePattern) {
-      const regex = new RegExp(filter.namePattern);
-      filtered = filtered.filter((f) => regex.test(f.name));
-    }
-
-    if (filter.minSize !== undefined) {
-      filtered = filtered.filter((f) => f.size >= filter.minSize!);
-    }
-
-    if (filter.maxSize !== undefined) {
-      filtered = filtered.filter((f) => f.size <= filter.maxSize!);
-    }
-
-    if (filter.excludeThunks) {
-      filtered = filtered.filter((f) => !f.isThunk);
-    }
-
-    if (filter.excludeExternal) {
-      filtered = filtered.filter((f) => !f.isExternal);
-    }
-  }
-
-  // Return summary (without pseudocode to reduce size)
-  return filtered.map((f) => ({
+  return functions.map((f) => ({
     name: f.name,
     address: f.address,
     size: f.size,
