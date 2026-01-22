@@ -8,16 +8,24 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)]()
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)]()
 
-Arael is an MCP (Model Context Protocol) server that bridges Ghidra's binary analysis with Claude Code. It enables AI-assisted reverse engineering through structured JSON APIs.
+Arael runs Ghidra analysis and exposes the results as structured JSON. Use it as a CLI, an MCP server for LLMs, or an interactive shell for quick triage.
 
 > **Bachelor's Thesis Project for 2026 by Raul Radulescu**
 
 ---
 
-## What's New in v2.6
+## Why Arael
+- One command to analyze a binary with Ghidra
+- Clean JSON output for automation, scripts, and LLM prompts
+- CLI, MCP server, and interactive shell in one tool
 
-### LLM Context Layer
+---
+
+## New in v2.6
+
+### LLM Integration
 - **`arael context`**: LLM-optimized analysis with classification, behaviors, and IOCs
+- **`arael ask`**: Natural language queries using OpenAI, Anthropic, Google (Gemini), or Ollama
 - **Behavior Detection**: 25+ rules detecting network, injection, credential theft, ransomware patterns
 - **MITRE ATT&CK Mapping**: 36 techniques mapped with confidence scores
 - **IOC Extraction**: IPs, domains, URLs, registry keys, file paths, mutexes
@@ -25,8 +33,12 @@ Arael is an MCP (Model Context Protocol) server that bridges Ghidra's binary ana
 - **Import Database**: 483 functions with capability categories and risk levels
 
 ```bash
-# Get LLM-optimized context
+# LLM-ready context
 arael context ./malware.exe
+
+# Ask questions using LLM (OpenAI, Anthropic, Google, or Ollama)
+arael ask ./binary -q "Is this malicious?"
+arael ask ./binary -q malicious -p google
 
 # JSON output for programmatic use
 arael context ./binary --json
@@ -40,7 +52,7 @@ arael context ./binary --json
 - Risk assessment
 - Suggested analysis steps
 
-### Previous: v2.5
+### Also in v2.5
 - Interactive Shell: `arael shell ./binary`
 - Batch Analysis: `arael batch ./samples/*.exe`
 - YARA Scanning: 43 built-in + 310 ReversingLabs rules
@@ -49,13 +61,138 @@ arael context ./binary --json
 
 ---
 
-## Features
+## Quick Start
+
+### Prerequisites
+- Node.js 20+, Python 3.10+, Java 17+, Ghidra 12.0+
+
+### Install and build
+```bash
+git clone https://github.com/raulradulescu/arael.git
+cd arael
+
+# Python setup
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install pyghidra
+
+# Node setup
+npm install
+
+# Configure .env
+echo 'GHIDRA_PATH="/path/to/ghidra_12.0_PUBLIC"' > .env
+echo 'ARAEL_PYTHON="/path/to/.venv/bin/python"' >> .env
+
+# Optional: Add LLM API keys for 'arael ask' command
+echo 'OPENAI_API_KEY=sk-...' >> .env
+echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env
+echo 'GOOGLE_API_KEY=AIza...' >> .env
+
+# Build
+npm run build
+```
+
+### First run
+```bash
+# Fast overview for LLMs or humans
+arael context ./binary
+
+# Full JSON analysis
+arael analyze ./binary
+```
+
+### Optional: Configure Claude Code
+Add to `~/.config/claude-code/mcp.json`:
+```json
+{
+  "servers": {
+    "arael": {
+      "command": "node",
+      "args": ["/path/to/arael/dist/mcp/server.js"],
+      "env": {
+        "GHIDRA_PATH": "/path/to/ghidra",
+        "ARAEL_PYTHON": "/path/to/python"
+      }
+    }
+  }
+}
+```
+
+---
+
+## Usage
+
+### CLI (common workflows)
+```bash
+# Core analysis
+arael analyze ./binary
+arael functions ./binary --filter "^main"
+arael decompile ./binary --function main
+arael disassemble ./binary --function main
+
+# Data extraction
+arael strings ./binary --min-length 6
+arael imports ./binary
+arael exports ./binary
+
+# Flow analysis
+arael xrefs ./binary --address 0x401000
+arael callgraph ./binary --format mermaid --root main
+
+# Utilities
+arael hexdump ./binary --address 0x401000 --length 128
+arael yara ./binary
+arael report ./binary --output report.html
+
+# LLM queries (v2.6)
+arael ask ./binary -q "Is this malicious?"
+arael ask ./binary -q summary -p ollama
+arael ask --list-templates
+
+# Interactive and batch
+arael shell ./binary
+arael batch "./samples/*.exe" --output ./results
+```
+
+### MCP tools (for LLMs)
+```python
+# LLM-optimized context (v2.6)
+context = await arael_context({"filepath": "./binary"})
+# Returns: classification, behaviors, iocs, mitreAttack, riskAssessment
+
+# Full analysis
+result = await arael_analyze({"filepath": "./binary"})
+
+# Decompile
+code = await arael_decompile({"filepath": "./binary", "function": "main"})
+
+# Cross-references
+xrefs = await arael_xrefs({"filepath": "./binary", "address": "0x401000"})
+```
+
+### Slash commands (Claude Code)
+
+| Command | Description |
+|---------|-------------|
+| `/arael` | Full binary analysis |
+| `/decompile` | Decompile function |
+| `/disasm` | Disassemble |
+| `/xrefs` | Cross-references |
+| `/callgraph` | Call graph |
+| `/strings` | Search strings |
+| `/imports` | List imports |
+| `/hexdump` | Raw bytes |
+
+---
+
+## Command Reference
 
 ### Core Analysis
 | Command | Description | Output |
 |---------|-------------|--------|
 | `analyze` | Full Ghidra analysis | JSON: binary, functions[], strings[], imports[], exports[] |
 | `context` | LLM-optimized context (v2.6) | JSON: classification, behaviors[], mitreAttack{}, iocs{}, riskAssessment |
+| `ask` | Ask LLM questions (v2.6) | LLM response with analysis context |
 | `functions` | List functions | JSON array: name, address, size |
 | `decompile` | C pseudocode | String: decompiled code |
 | `disassemble` | Assembly listing | JSON array: instructions |
@@ -84,119 +221,6 @@ arael context ./binary --json
 | PE | x86_64, x86, ARM64, ARM32 |
 | Mach-O | x86_64, ARM64 (Apple Silicon) |
 | MZ/COM/RAW | 16-bit DOS, boot sectors |
-
----
-
-## Quick Start
-
-### Prerequisites
-- Node.js 20+, Python 3.10+, Java 17+, Ghidra 12.0+
-
-### Installation
-
-```bash
-git clone https://github.com/raulradulescu/arael.git
-cd arael
-
-# Python setup
-python3 -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install pyghidra
-
-# Node setup
-npm install
-
-# Configure .env
-echo 'GHIDRA_PATH="/path/to/ghidra_12.0_PUBLIC"' > .env
-echo 'ARAEL_PYTHON="/path/to/.venv/bin/python"' >> .env
-
-# Build
-npm run build
-```
-
-### Configure Claude Code
-
-Add to `~/.config/claude-code/mcp.json`:
-```json
-{
-  "servers": {
-    "arael": {
-      "command": "node",
-      "args": ["/path/to/arael/dist/mcp/server.js"],
-      "env": {
-        "GHIDRA_PATH": "/path/to/ghidra",
-        "ARAEL_PYTHON": "/path/to/python"
-      }
-    }
-  }
-}
-```
-
----
-
-## Usage
-
-### CLI
-
-```bash
-# v2.6: LLM Context (recommended starting point)
-arael context ./binary              # Human-readable
-arael context ./binary --json       # Machine-readable
-
-# Core analysis
-arael analyze ./binary
-arael functions ./binary --filter "^main"
-arael decompile ./binary --function main
-arael disassemble ./binary --function main
-
-# Data extraction
-arael strings ./binary --min-length 6
-arael imports ./binary
-arael exports ./binary
-
-# Flow analysis
-arael xrefs ./binary --address 0x401000
-arael callgraph ./binary --format mermaid --root main
-
-# Utilities
-arael hexdump ./binary --address 0x401000 --length 128
-arael yara ./binary
-arael report ./binary --output report.html
-
-# Interactive
-arael shell ./binary
-arael batch "./samples/*.exe" --output ./results
-```
-
-### MCP Tools
-
-```python
-# LLM-optimized context (v2.6)
-context = await arael_context({"filepath": "./binary"})
-# Returns: classification, behaviors, iocs, mitreAttack, riskAssessment
-
-# Full analysis
-result = await arael_analyze({"filepath": "./binary"})
-
-# Decompile
-code = await arael_decompile({"filepath": "./binary", "function": "main"})
-
-# Cross-references
-xrefs = await arael_xrefs({"filepath": "./binary", "address": "0x401000"})
-```
-
-### Slash Commands (Claude Code)
-
-| Command | Description |
-|---------|-------------|
-| `/arael` | Full binary analysis |
-| `/decompile` | Decompile function |
-| `/disasm` | Disassemble |
-| `/xrefs` | Cross-references |
-| `/callgraph` | Call graph |
-| `/strings` | Search strings |
-| `/imports` | List imports |
-| `/hexdump` | Raw bytes |
 
 ---
 
@@ -229,8 +253,9 @@ npm run test:coverage
 ```
 arael/
 ├── src/
-│   ├── analysis/     # v2.6: behavior-detector, ioc-extractor, mitre-mapper, import-database
-│   ├── cli/          # CLI commands including context
+│   ├── analysis/     # v2.6: behavior-detector, ioc-extractor, mitre-mapper, import-database, string-xrefs
+│   ├── llm/          # v2.6: LLM providers (OpenAI, Anthropic, Google, Ollama), prompts
+│   ├── cli/          # CLI commands including context and ask
 │   ├── mcp/          # MCP server & handlers
 │   ├── ghidra/       # Ghidra integration
 │   ├── cache/        # SQLite caching
@@ -252,15 +277,13 @@ arael/
 
 ## Roadmap
 
-### ✅ Complete
+### Complete (v2.6)
 - **Phase 1-2**: Foundation, PyGhidra, core tools
 - **Phase 3**: Advanced tools (xrefs, callgraph, disassemble)
 - **Phase 4**: Packing detection, import categorization
 - **Phase 5**: x86 16/32-bit, .pyc decompilation
 - **Phase 6**: Interactive shell, batch, YARA, reports, ARM
-- **Phase 7**: LLM Context Layer (v2.6) - context command, behaviors, MITRE, IOCs
-
-### ⏳ Planned
+- **Phase 7**: LLM Context Layer - context command, behaviors, MITRE, IOCs
 - **Phase 8**: `arael ask` - Natural language queries with LLM providers
 
 ---

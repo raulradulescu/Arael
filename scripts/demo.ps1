@@ -1,4 +1,4 @@
-# Arael v2.5 - Live Demo Script (PowerShell)
+# Arael v2.6 - Live Demo Script (PowerShell)
 # Run sections individually for presentation
 
 param(
@@ -172,7 +172,7 @@ function Demo-Shell {
 function Run-FullDemo {
     param([string]$Binary)
 
-    Write-Header "ARAEL v2.5 - FULL DEMO"
+    Write-Header "ARAEL v2.6 - FULL DEMO"
     Write-Host "Using binary: $Binary"
     Pause-Demo
 

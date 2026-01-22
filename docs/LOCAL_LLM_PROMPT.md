@@ -9,6 +9,8 @@ Use Arael with local LLMs that don't support MCP directly.
 arael analyze ./binary              # Full analysis (JSON)
 arael context ./binary              # LLM-optimized context (v2.6)
 arael context ./binary --json       # Machine-readable context
+arael ask ./binary -q "Is this malicious?"  # LLM query (v2.6)
+arael ask ./binary -q malicious -p google   # Use specific provider (openai, anthropic, google, ollama)
 
 # Code Analysis
 arael functions ./binary --filter "main"
@@ -38,6 +40,7 @@ arael batch "./samples/*.exe"      # Batch analysis
 |---------|--------|
 | `analyze` | JSON: binary metadata, functions[], strings[], imports[], exports[], packing info |
 | `context` | JSON: classification, behaviors[], mitreAttack{}, iocs{}, riskAssessment, suggestedAnalysis[] |
+| `ask` | LLM response text with analysis context injected |
 | `functions` | JSON array: name, address, size, isThunk, isExternal |
 | `decompile` | C pseudocode string with variable types and control flow |
 | `disassemble` | JSON array: address, mnemonic, operands, bytes, references |
@@ -57,6 +60,7 @@ You are a reverse engineering assistant using Arael CLI.
 Commands:
 - arael analyze <path>           - Full analysis → JSON with binary, functions, strings, imports
 - arael context <path>           - LLM context → JSON with classification, behaviors, IOCs, MITRE
+- arael ask <path> -q <question> - Ask LLM about binary (supports: openai, anthropic, google, ollama)
 - arael functions <path>         - List functions → JSON array with name, address, size
 - arael decompile <path> -f <fn> - Decompile → C pseudocode string
 - arael disassemble <path> -f <fn> - Disassemble → JSON with instructions

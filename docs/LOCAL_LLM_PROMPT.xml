@@ -30,6 +30,15 @@
       <example>arael context ./malware.exe --json</example>
     </command>
 
+    <command name="arael ask">
+      <syntax>arael ask &lt;filepath&gt; -q &lt;question&gt; [-p &lt;provider&gt;] [-m &lt;model&gt;]</syntax>
+      <description>Ask LLM questions about a binary (OpenAI, Anthropic, Google Gemini, or Ollama)</description>
+      <output>LLM response text with binary analysis context injected</output>
+      <providers>openai (gpt-4o-mini), anthropic (claude-sonnet-4), google (gemini-2.0-flash), ollama (llama3.2)</providers>
+      <templates>malicious, purpose, main, network, persistence, credentials, evasion, iocs, summary</templates>
+      <example>arael ask ./binary -q "Is this malicious?" -p google</example>
+    </command>
+
     <!-- Core Analysis -->
     <command name="arael analyze">
       <syntax>arael analyze &lt;filepath&gt; [--force]</syntax>

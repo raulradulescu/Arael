@@ -1,5 +1,5 @@
 #!/bin/bash
-# Arael v2.5 - Live Demo Script
+# Arael v2.6 - Live Demo Script
 # Run sections individually for presentation
 
 set -e
@@ -150,7 +150,7 @@ demo_shell() {
 run_full_demo() {
     BINARY="${1:-./tests/fixtures/hello_world}"
 
-    print_header "ARAEL v2.5 - FULL DEMO"
+    print_header "ARAEL v2.6 - FULL DEMO"
     echo "Using binary: $BINARY"
     pause
 

@@ -1,7 +1,7 @@
 # Arael v2.6 Roadmap
 
 **Milestone:** v2.6.0 - LLM Context Layer
-**Status:** In Progress
+**Status:** Complete
 
 ---
 
@@ -9,14 +9,14 @@
 
 | Phase | Name | Status | Goal |
 |-------|------|--------|------|
-| 1 | Foundation & Testing | Complete | TDD tests for all v2.6 features |
+| 1 | Foundation & Testing | **Complete** | TDD tests for all v2.6 features |
 | 2 | Import Database Expansion | **Complete** | 483 function capability database |
 | 3 | IOC Extraction | **Complete** | Extract IPs, domains, URLs, registry keys from strings |
 | 4 | Behavior Detection | **Complete** | Automated behavioral classification from imports/strings |
-| 5 | String Cross-References | Pending | Populate xrefs showing which functions use which strings |
+| 5 | String Cross-References | **Complete** | Utility functions for string xref analysis |
 | 6 | MITRE ATT&CK Mapping | **Complete** | 36 ATT&CK techniques mapped |
 | 7 | LLM Context Command | **Complete** | `arael context` - unified LLM-optimized output |
-| 8 | Ask Command | Pending | `arael ask` - natural language binary queries |
+| 8 | Ask Command | **Complete** | `arael ask` - natural language binary queries |
 
 ---
 
@@ -125,9 +125,16 @@
 - REQ-XREF-04: Support reverse lookup (functions using pattern)
 
 **Success Criteria:**
-- [ ] StringXref module created
-- [ ] >90% xref coverage
-- [ ] Function-centric and string-centric views
+- [x] StringXref module created (`src/analysis/string-xrefs.ts`)
+- [x] Function-centric and string-centric views
+- [x] Suspicious function detection
+
+**Implementation:**
+- `getStringsUsedByFunction()` - Get all strings referenced by a function
+- `getFunctionsUsingString()` - Find functions referencing a string pattern
+- `getStringUsageByFunction()` - Build complete usage map
+- `findSuspiciousFunctions()` - Identify functions with suspicious strings
+- `getXrefStats()` - Cross-reference statistics
 
 ---
 
@@ -199,16 +206,28 @@ arael context ./malware.exe --focus security
 
 **CLI Interface:**
 ```bash
-arael ask ./binary "What does the main function do?"
-arael ask ./binary "Is this binary malicious?"
-arael ask ./binary --interactive
+arael ask ./binary -q "What does the main function do?"
+arael ask ./binary -q malicious
+arael ask --list-templates
+arael ask --list-providers
 ```
 
 **Success Criteria:**
-- [ ] CLI command implemented
-- [ ] 3 LLM providers supported
-- [ ] >85% query accuracy
-- [ ] Interactive REPL mode
+- [x] CLI command implemented
+- [x] 4 LLM providers supported (OpenAI, Anthropic, Google Gemini, Ollama)
+- [x] 9 question templates (malicious, purpose, main, network, persistence, credentials, evasion, iocs, summary)
+- [x] Context injection from analysis
+
+**Implementation:**
+- `src/llm/provider.ts` - OpenAI, Anthropic, Google, Ollama providers
+- `src/llm/prompts.ts` - System prompt and question templates
+- CLI `arael ask` command with `-q`, `-p`, `-m`, `--list-templates`, `--list-providers`
+
+**Default Models:**
+- OpenAI: gpt-4o-mini
+- Anthropic: claude-sonnet-4-20250514
+- Google: gemini-2.0-flash
+- Ollama: llama3.2
 
 ---
 

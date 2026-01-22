@@ -24,9 +24,9 @@ Arael automates binary analysis and provides LLM-optimized output that enables A
 3. Extract actionable intelligence (IOCs, ATT&CK mapping)
 4. Answer natural language questions about binaries
 
-## Current State (v2.5)
+## Current State (v2.6)
 
-Arael v2.5 is **production-ready** with:
+Arael v2.6 is **production-ready** with:
 - 10 MCP tools (analyze, decompile, disassemble, functions, strings, imports, exports, xrefs, callgraph, hexdump)
 - Multi-format support (ELF, PE, Mach-O, MZ/COM/RAW, ARM)
 - Interactive shell, batch analysis, YARA scanning, HTML reports

@@ -24,6 +24,8 @@ import { extractIOCs, countIOCs } from '../analysis/ioc-extractor';
 import { detectBehaviors, assessBehaviorRisk, classifyBinaryType } from '../analysis/behavior-detector';
 import { mapToATTACK } from '../analysis/mitre-mapper';
 import { assessImportRisk } from '../analysis/import-database';
+import { createProvider, getAvailableProviders, LLMProviderConfig } from '../llm/provider';
+import { SYSTEM_PROMPT, formatQuestion, expandQuestion, QUESTION_TEMPLATES } from '../llm/prompts';
 
 loadEnvFromFile();
 
@@ -43,12 +45,12 @@ const program = new Command();
 
 program
   .name('arael')
-  .description('Reverse engineering assistant using Ghidra')
+  .description('Reverse engineering assistant that uses Ghidra for static binary analysis')
   .version(version);
 
 program
   .command('analyze <filepath>')
-  .description('Perform full analysis of a binary')
+  .description('Run full Ghidra analysis and emit JSON (metadata, functions, strings, imports, packing)')
   .option('-f, --force', 'Bypass cache and re-analyze')
   .option('-o, --output <format>', 'Output format (json|summary)', 'json')
   .action(async (filepath: string, options: { force?: boolean; output?: string }) => {
@@ -66,7 +68,7 @@ program
 
 program
   .command('context <filepath>')
-  .description('Generate LLM-optimized analysis context (v2.6)')
+  .description('Generate LLM-focused context with behaviors, IOCs, MITRE mapping, and key functions')
   .option('-j, --json', 'Output as JSON')
   .option('--focus <area>', 'Focus area: security, functionality, all', 'all')
   .option('--include-code', 'Include pseudocode for key functions')
@@ -227,8 +229,109 @@ program
   });
 
 program
+  .command('ask [filepath]')
+  .description('Ask questions about a binary using an LLM (OpenAI, Anthropic, Google, or Ollama)')
+  .option('-q, --question <text>', 'Question to ask (or use template: malicious, purpose, main, network, persistence, credentials, evasion, iocs, summary)')
+  .option('-p, --provider <name>', 'LLM provider: openai, anthropic, google, ollama (auto-detects by default)')
+  .option('-m, --model <name>', 'Model name (default: provider-specific)')
+  .option('--list-templates', 'List available question templates')
+  .option('--list-providers', 'List available LLM providers')
+  .action(async (filepath: string | undefined, options: { question?: string; provider?: string; model?: string; listTemplates?: boolean; listProviders?: boolean }) => {
+    try {
+      // List templates
+      if (options.listTemplates) {
+        console.log('Available question templates:\n');
+        for (const [key, template] of Object.entries(QUESTION_TEMPLATES)) {
+          console.log(`  ${key.padEnd(14)} - ${template.substring(0, 60)}...`);
+        }
+        console.log('\nUsage: arael ask ./binary -q malicious');
+        console.log('       arael ask ./binary -q "What encryption algorithm is used?"');
+        return;
+      }
+
+      // List providers
+      if (options.listProviders) {
+        console.log('Checking available LLM providers...\n');
+        const available = await getAvailableProviders();
+        console.log('Available providers:');
+        for (const p of available) {
+          console.log(`  ✓ ${p}`);
+        }
+        const allProviders = ['openai', 'anthropic', 'google', 'ollama'];
+        const unavailable = allProviders.filter(p => !available.includes(p));
+        if (unavailable.length > 0) {
+          console.log('\nUnavailable (no API key or not running):');
+          for (const p of unavailable) {
+            console.log(`  ✗ ${p}`);
+          }
+        }
+        console.log('\nSet API keys via: OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY (or GEMINI_API_KEY)');
+        console.log('For Ollama: ensure ollama is running on localhost:11434');
+        return;
+      }
+
+      if (!filepath) {
+        console.error('Error: filepath is required. Usage: arael ask ./binary -q "your question"');
+        process.exit(1);
+      }
+
+      if (!options.question) {
+        console.error('Error: --question is required. Use --list-templates to see available templates.');
+        process.exit(1);
+      }
+
+      // Initialize and analyze
+      await initConnection();
+      logger.userMessage('Analyzing binary...');
+      const result = await analyzeHandler({ filepath });
+
+      // Expand question template if used
+      const question = expandQuestion(options.question);
+
+      // Create provider
+      const providerConfig: Partial<LLMProviderConfig> = {};
+      if (options.provider) {
+        providerConfig.provider = options.provider as 'openai' | 'anthropic' | 'google' | 'ollama';
+      }
+      if (options.model) {
+        providerConfig.model = options.model;
+      }
+
+      const provider = createProvider(providerConfig);
+      const isAvailable = await provider.isAvailable();
+      if (!isAvailable) {
+        console.error(`Error: Provider '${provider.name}' is not available. Use --list-providers to check.`);
+        process.exit(1);
+      }
+
+      logger.userMessage(`Querying ${provider.name}...`);
+
+      // Build context and query
+      const formattedQuestion = formatQuestion(question, result);
+      const response = await provider.chat([
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: formattedQuestion }
+      ]);
+
+      // Output
+      console.log('\n' + '='.repeat(70));
+      console.log(`ARAEL ASK (${provider.name}/${response.model})`);
+      console.log('='.repeat(70));
+      console.log(`\nQuestion: ${question}\n`);
+      console.log(response.content);
+
+      if (response.usage) {
+        console.log(`\n[Tokens: ${response.usage.inputTokens} in / ${response.usage.outputTokens} out]`);
+      }
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  });
+
+program
   .command('functions <filepath>')
-  .description('List all functions in a binary')
+  .description('List discovered functions with addresses and sizes (filtering supported)')
   .option('--filter <regex>', 'Filter functions by name pattern')
   .option('--exclude-thunks', 'Exclude thunk functions')
   .option('--exclude-external', 'Exclude external functions')
@@ -259,7 +362,7 @@ program
 
 program
   .command('decompile <filepath>')
-  .description('Decompile a specific function')
+  .description('Decompile a function by name or address into C-like pseudocode')
   .requiredOption('--function <name>', 'Function name or address')
   .action(async (filepath: string, options: { function: string }) => {
     try {
@@ -281,7 +384,7 @@ program
 
 program
   .command('strings <filepath>')
-  .description('Extract strings from binary')
+  .description('Extract printable strings with optional xrefs and length filtering')
   .option('--min-length <n>', 'Minimum string length', '4')
   .option('--with-xrefs', 'Include cross-references')
   .action(async (filepath: string, options: { minLength?: string; withXrefs?: boolean }) => {
@@ -311,7 +414,7 @@ program
 
 program
   .command('imports <filepath>')
-  .description('List imported functions')
+  .description('List imported symbols with libraries and capability tags')
   .action(async (filepath: string) => {
     try {
       await initConnection();
@@ -325,7 +428,7 @@ program
 
 program
   .command('hexdump <filepath>')
-  .description('Dump raw bytes at address')
+  .description('Hex dump raw bytes from a start address and length')
   .requiredOption('--address <addr>', 'Start address (0x...)')
   .option('--length <n>', 'Number of bytes', '256')
   .action(async (filepath: string, options: { address: string; length?: string }) => {
@@ -345,7 +448,7 @@ program
 
 program
   .command('disassemble <filepath>')
-  .description('Disassemble a function')
+  .description('Disassemble a function by name or address into an assembly listing')
   .requiredOption('--function <name>', 'Function name or address')
   .action(async (filepath: string, options: { function: string }) => {
     try {
@@ -368,7 +471,7 @@ program
 
 program
   .command('exports <filepath>')
-  .description('List exported symbols')
+  .description('List exported symbols and optionally filter by name pattern')
   .option('--filter <regex>', 'Filter exports by name pattern')
   .action(async (filepath: string, options: { filter?: string }) => {
     try {
@@ -390,7 +493,7 @@ program
 
 program
   .command('xrefs <filepath>')
-  .description('Find cross-references')
+  .description('Show cross-references to/from an address or function name')
   .requiredOption('--address <addr>', 'Address or function name')
   .option('--direction <dir>', 'Direction: to, from, or both', 'both')
   .action(async (filepath: string, options: { address: string; direction?: string }) => {
@@ -411,7 +514,7 @@ program
 
 program
   .command('callgraph <filepath>')
-  .description('Generate call graph')
+  .description('Generate call graph output in JSON, DOT, or Mermaid with optional root/depth')
   .option('--root <func>', 'Root function (default: all)')
   .option('--format <fmt>', 'Output format: json, dot, mermaid', 'mermaid')
   .option('--depth <n>', 'Maximum depth', '10')
@@ -434,7 +537,7 @@ program
 
 program
   .command('shell <filepath>')
-  .description('Start interactive analysis shell')
+  .description('Start an interactive REPL for common analysis commands on a binary')
   .action(async (filepath: string) => {
     try {
       await startShell(filepath);
@@ -446,7 +549,7 @@ program
 
 program
   .command('batch <pattern>')
-  .description('Analyze multiple binaries matching a glob pattern')
+  .description('Analyze multiple binaries from a glob pattern and save JSON results')
   .option('-o, --output <dir>', 'Output directory for JSON results', './arael_output')
   .option('-f, --force', 'Bypass cache and re-analyze')
   .option('--summary', 'Print summary table after completion')
@@ -518,7 +621,7 @@ program
 
 program
   .command('report <filepath>')
-  .description('Generate HTML analysis report')
+  .description('Generate a standalone HTML report with stats, top functions, and strings')
   .option('-o, --output <file>', 'Output HTML file', 'report.html')
   .option('--title <title>', 'Report title')
   .action(async (filepath: string, options: { output?: string; title?: string }) => {
@@ -540,7 +643,7 @@ program
 
 program
   .command('yara [filepath]')
-  .description('Scan binary with YARA rules')
+  .description('Scan with built-in or custom YARA rules, or list available rule sets')
   .option('-r, --rules <file>', 'Custom YARA rules file')
   .option('-s, --ruleset <set>', 'Rule set: builtin, reversinglabs, all (default: builtin)')
   .option('-c, --category <cat>', 'Filter by category (packer, crypto, network, anti-debug, suspicious, ctf, shellcode, evasion, malware, compiler, ransomware)')
@@ -647,7 +750,7 @@ program
 
 program
   .command('cache')
-  .description('Cache management commands')
+  .description('Show cache stats or clear cached analyses')
   .option('--stats', 'Show cache statistics')
   .option('--clear', 'Clear all cached analyses')
   .action((options: { stats?: boolean; clear?: boolean }) => {

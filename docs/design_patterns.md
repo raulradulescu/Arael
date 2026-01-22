@@ -370,4 +370,4 @@ These patterns collectively provide:
 ---
 
 *Document generated: 2026-01-09*
-*Arael v2.5.0*
+*Arael v2.6.0*
