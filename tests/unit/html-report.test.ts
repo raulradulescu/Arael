@@ -17,6 +17,19 @@ describe('analysis HTML report', () => {
     expect(html).toContain('data-sortable="true"');
     expect(html).toContain('flag{&lt;script&gt;}');
     expect(html).toContain('data-copy="flag{&lt;script&gt;}"');
+    expect(html).toContain('Function Details');
+    expect(html).toContain('id="fn-0x401000"');
+    expect(html).toContain('href="#fn-0x401100"');
+    expect(html).toContain('data-search-target="function-details"');
+    expect(html).toContain('puts(&quot;flag{&lt;script&gt;}&quot;)');
+    expect(html).not.toContain('puts("<script>")');
+    expect(html).toContain('Decompile Error');
+    expect(html).toContain('failed &lt;script&gt; &amp; bad');
+    expect(html).toContain('badge badge-danger">decompile error</span>');
+    expect(html).toContain('no decompilation available');
+    expect(html).toContain('0x90 0x90');
+    expect(html).toContain('validates &lt;input&gt;');
+    expect(html).toContain('String References');
   });
 });
 
@@ -66,24 +79,60 @@ function makeAnalysisResult(): AnalysisResult {
       entropy: 5.1,
       anomalies: []
     }],
-    functions: [{
-      name: 'main<script>',
-      address: '0x401000',
-      size: 42,
-      signature: 'int main()',
-      isThunk: false,
-      isExternal: false,
-      callers: [],
-      callees: [],
-      pseudocode: null
-    }],
+    functions: [
+      {
+        name: 'main<script>',
+        address: '0x401000',
+        size: 420,
+        signature: 'int main()',
+        isThunk: false,
+        isExternal: false,
+        callers: ['0x400900'],
+        callees: ['helper', 'connect'],
+        pseudocode: 'int main() {\n  puts("flag{<script>}");\n  return 0;\n}',
+        hexdump: {
+          address: '0x401000',
+          bytes: '9090',
+          formatted: '0x401000  0x90 0x90  <script>'
+        },
+        agentAnalysis: {
+          purpose: 'validates <input>',
+          semanticName: 'validate_flag',
+          securityNotes: 'prints <flag>',
+          confidence: 0.75
+        }
+      },
+      {
+        name: 'helper',
+        address: '0x401100',
+        size: 100,
+        signature: 'void helper()',
+        isThunk: false,
+        isExternal: false,
+        callers: ['main<script>'],
+        callees: [],
+        pseudocode: null,
+        decompileError: 'failed <script> & bad'
+      },
+      {
+        name: 'no_decomp',
+        address: '0x401200',
+        size: 10,
+        signature: 'void no_decomp()',
+        isThunk: false,
+        isExternal: false,
+        callers: [],
+        callees: [],
+        pseudocode: null
+      }
+    ],
     strings: [{
       address: '0x402000',
       value: 'flag{<script>}',
       length: 14,
       encoding: 'ascii',
       section: '.rodata',
-      xrefs: []
+      xrefs: [{ address: '0x401020', function: '0x401000', type: 'data' }]
     }],
     imports: [{
       name: 'connect',

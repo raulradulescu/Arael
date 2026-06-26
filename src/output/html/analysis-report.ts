@@ -1,4 +1,4 @@
-import type { AnalysisResult, ImportCapability, SectionInfo, StringInfo } from '../schema';
+import type { AnalysisResult, FunctionInfo, ImportCapability, ImportInfo, SectionInfo, StringInfo } from '../schema';
 import { badge, bar, collapsible, copyButton, searchBox, statCard, table } from './components';
 import { escapeHtml } from './escape';
 import { formatGeneratedDate, renderHtmlDocument } from './layout';
@@ -22,6 +22,10 @@ export function renderAnalysisHtml(result: AnalysisResult, opts: RenderAnalysisH
     .filter(func => !func.isThunk && !func.isExternal)
     .sort((left, right) => right.size - left.size)
     .slice(0, 100);
+  const localFunctionsBySize = [...result.functions]
+    .filter(func => !func.isThunk && !func.isExternal)
+    .sort((left, right) => right.size - left.size);
+  const detailFunctions = localFunctionsBySize.slice(0, 50);
 
   const body = `
   <div class="header">
@@ -83,6 +87,7 @@ export function renderAnalysisHtml(result: AnalysisResult, opts: RenderAnalysisH
     ${capabilities.names.size > 0 ? renderCapabilities(capabilities) : ''}
     ${sections.length > 0 ? renderSections(sections, suspiciousSections.length) : ''}
     ${renderFunctions(topFunctions)}
+    ${renderFunctionDetails(result, detailFunctions, localFunctionsBySize.length)}
     ${interestingStrings.length > 0 ? renderStrings(interestingStrings) : ''}
     ${renderImports(result)}
   </div>`;
@@ -136,7 +141,7 @@ function riskLabel(level: RiskLevel): string {
 function packingSummary(result: AnalysisResult): string {
   const packing = result.binary.packing;
   const packedBadge = packing?.isPacked ? badge('Packed', 'warn') : badge('Clean', 'success');
-  const packers = packing?.packers.map(packer => `${packer.name}${packer.version ? ` ${packer.version}` : ''}`) ?? [];
+  const packers = packing?.packers?.map(packer => `${packer.name}${packer.version ? ` ${packer.version}` : ''}`) ?? [];
   const entropy = packing?.entropy?.overall;
   const suspicious = packing?.suspiciousIndicators ?? [];
   return `
@@ -207,6 +212,240 @@ function renderFunctions(functions: AnalysisResult['functions']): string {
       ${table(['Name', 'Address', 'Size', 'Signature', 'Kind'], rows, { id: 'functions-table', sortable: true })}
     </div>
   `;
+}
+
+function renderFunctionDetails(result: AnalysisResult, functions: FunctionInfo[], totalLocalFunctions: number): string {
+  if (functions.length === 0) {
+    return '';
+  }
+
+  const lookup = buildFunctionLookup(result.functions);
+  const entryPoints = new Set([
+    normalizeIdentifier(result.binary.entryPoint),
+    normalizeIdentifier(result.entryPoint ?? '')
+  ].filter(Boolean));
+  const panels = functions.map((func, index) =>
+    renderFunctionPanel({
+      func,
+      result,
+      lookup,
+      openByDefault: shouldOpenFunctionPanel(func, index, entryPoints)
+    })
+  ).join('');
+  const truncation = totalLocalFunctions > functions.length
+    ? `<p class="muted">Showing ${escapeHtml(functions.length)} of ${escapeHtml(totalLocalFunctions)} local functions by size.</p>`
+    : '';
+
+  return `
+    <div class="section">
+      <div class="section-header"><span class="section-icon">d</span><h2>Function Details</h2></div>
+      <div class="toolbar">${searchBox('function-details', 'Search function details')}</div>
+      ${truncation}
+      <div id="function-details" class="function-details">
+        ${panels}
+      </div>
+    </div>
+  `;
+}
+
+function renderFunctionPanel(input: {
+  func: FunctionInfo;
+  result: AnalysisResult;
+  lookup: Map<string, FunctionInfo>;
+  openByDefault: boolean;
+}): string {
+  const { func, result, lookup, openByDefault } = input;
+  const title = [
+    escapeHtml(func.name),
+    `<span class="muted">${escapeHtml(func.address)}</span>`,
+    badge(`${func.size.toLocaleString()} bytes`, 'muted'),
+    func.decompileError ? badge('decompile error', 'danger') : '',
+    func.pseudocode ? badge('has pseudocode', 'success') : badge('stripped', 'muted')
+  ].filter(Boolean).join(' ');
+  const stringXrefs = stringsForFunction(result.strings, func);
+  const usedImports = importsForFunction(result.imports, func);
+  const searchText = [
+    func.name,
+    func.address,
+    func.signature,
+    ...func.callers,
+    ...func.callees,
+    ...stringXrefs.map(stringInfo => stringInfo.value),
+    ...usedImports.map(imp => `${imp.name} ${imp.library}`)
+  ].join(' ');
+
+  return `
+    <details class="collapsible function-detail" id="${escapeHtml(functionAnchor(func.address))}" data-search-item data-search-text="${escapeHtml(searchText)}"${openByDefault ? ' open' : ''}>
+      <summary>${title}</summary>
+      <div class="collapsible-body">
+        ${renderFunctionMetadata(func)}
+        <div class="detail-grid">
+          ${renderCallList('Callers', func.callers, lookup)}
+          ${renderCallList('Callees', func.callees, lookup)}
+        </div>
+        ${usedImports.length > 0 ? renderFunctionImports(usedImports) : ''}
+        ${stringXrefs.length > 0 ? renderFunctionStringXrefs(stringXrefs) : ''}
+        ${renderFunctionPseudocode(func)}
+        ${renderFunctionHexdump(func)}
+        ${renderAgentFunctionAnalysis(func)}
+      </div>
+    </details>
+  `;
+}
+
+function renderFunctionMetadata(func: FunctionInfo): string {
+  return `
+    <div class="function-meta">
+      <div class="info-row">
+        <span class="info-label">Signature</span>
+        <span class="info-value"><span class="mono">${escapeHtml(func.signature)}</span></span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Address</span>
+        <span class="info-value">${code(func.address)}${copyButton(func.address, 'Copy address')}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderCallList(title: string, values: string[], lookup: Map<string, FunctionInfo>): string {
+  const items = values.length > 0
+    ? values.map(value => `<li>${linkFunctionReference(value, lookup)}</li>`).join('')
+    : '<li class="muted">none</li>';
+  return `
+    <div class="card compact-card">
+      <div class="card-title">${escapeHtml(title)}</div>
+      <ul class="link-list">${items}</ul>
+    </div>
+  `;
+}
+
+function renderFunctionImports(imports: ImportInfo[]): string {
+  const rows = imports.map(imp => [
+    escapeHtml(imp.name),
+    code(imp.library ?? '-'),
+    code(imp.address),
+    imp.riskLevel ? badge(imp.riskLevel, imp.riskLevel === 'critical' || imp.riskLevel === 'high' ? 'danger' : imp.riskLevel === 'medium' ? 'warn' : 'success') : '',
+    (imp.capabilities ?? []).map(capability => capabilityTag(capability)).join(' ')
+  ]);
+  return collapsible('Imports Used', table(['Name', 'Library', 'Address', 'Risk', 'Capabilities'], rows, { sortable: true }), true);
+}
+
+function renderFunctionStringXrefs(strings: StringInfo[]): string {
+  const rows = strings.map(stringInfo => [
+    code(stringInfo.address),
+    escapeHtml(truncate(stringInfo.value, 180)),
+    escapeHtml(stringInfo.encoding),
+    escapeHtml(stringInfo.xrefs.length.toLocaleString())
+  ]);
+  return collapsible('String References', table(['Address', 'Value', 'Encoding', 'Xrefs'], rows, { sortable: true }), true);
+}
+
+function renderFunctionPseudocode(func: FunctionInfo): string {
+  if (func.pseudocode) {
+    const open = func.pseudocode.length < 2500;
+    return collapsible('Pseudocode', renderCodeBlock(func.pseudocode, 'code-block'), open);
+  }
+
+  if (func.decompileError) {
+    return `
+      <div class="decompile-error">
+        ${badge('decompile error', 'danger')}
+        ${collapsible('Decompile Error', renderCodeBlock(func.decompileError, 'code-block error-block'), true)}
+      </div>
+    `;
+  }
+
+  return '<p class="muted">no decompilation available</p>';
+}
+
+function renderFunctionHexdump(func: FunctionInfo): string {
+  if (!func.hexdump) {
+    return '';
+  }
+  const heading = `Hexdump at ${func.hexdump.address}`;
+  return collapsible(heading, renderCodeBlock(func.hexdump.formatted, 'hexdump-block'), false);
+}
+
+function renderAgentFunctionAnalysis(func: FunctionInfo): string {
+  if (!func.agentAnalysis) {
+    return '';
+  }
+  const analysis = func.agentAnalysis;
+  const body = `
+    ${infoRow('Semantic Name', escapeHtml(analysis.semanticName))}
+    ${infoRow('Confidence', escapeHtml(`${Math.round(analysis.confidence * 100)}%`))}
+    <div class="analysis-note"><strong>Purpose</strong><p>${escapeHtml(analysis.purpose)}</p></div>
+    <div class="analysis-note"><strong>Security Notes</strong><p>${escapeHtml(analysis.securityNotes)}</p></div>
+  `;
+  return collapsible('Agent Analysis', body, false);
+}
+
+function buildFunctionLookup(functions: FunctionInfo[]): Map<string, FunctionInfo> {
+  const lookup = new Map<string, FunctionInfo>();
+  for (const func of functions) {
+    for (const value of [func.name, func.address]) {
+      const normalized = normalizeIdentifier(value);
+      if (normalized) {
+        lookup.set(normalized, func);
+      }
+    }
+  }
+  return lookup;
+}
+
+function shouldOpenFunctionPanel(func: FunctionInfo, index: number, entryPoints: Set<string>): boolean {
+  const name = normalizeIdentifier(func.name);
+  const address = normalizeIdentifier(func.address);
+  return name === 'main' || entryPoints.has(address) || index < 3;
+}
+
+function linkFunctionReference(value: string, lookup: Map<string, FunctionInfo>): string {
+  const target = lookup.get(normalizeIdentifier(value));
+  if (!target) {
+    return `<span class="mono">${escapeHtml(value)}</span>`;
+  }
+  return `<a class="mono" href="#${escapeHtml(functionAnchor(target.address))}">${escapeHtml(value)}</a>`;
+}
+
+function stringsForFunction(strings: StringInfo[], func: FunctionInfo): StringInfo[] {
+  return strings.filter(stringInfo => stringInfo.xrefs.some(xref => functionMatchesXref(func, xref.function) || functionMatchesXref(func, xref.address)));
+}
+
+function functionMatchesXref(func: FunctionInfo, value: string): boolean {
+  const normalized = normalizeIdentifier(value);
+  return normalized === normalizeIdentifier(func.address) || normalized === normalizeIdentifier(func.name);
+}
+
+function importsForFunction(imports: ImportInfo[], func: FunctionInfo): ImportInfo[] {
+  const callees = new Set(func.callees.map(normalizeIdentifier).filter(Boolean));
+  const seen = new Set<string>();
+  return imports.filter(imp => {
+    const matches = callees.has(normalizeIdentifier(imp.name)) || callees.has(normalizeIdentifier(imp.address));
+    const key = `${imp.name}:${imp.library}:${imp.address}`;
+    if (!matches || seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function renderCodeBlock(value: string, className: string): string {
+  return `<pre class="${escapeHtml(className)}"><code>${escapeHtml(value)}</code></pre>`;
+}
+
+function functionAnchor(address: string): string {
+  return `fn-${sanitizeAnchorId(address)}`;
+}
+
+function sanitizeAnchorId(value: string): string {
+  const sanitized = value.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+  return sanitized || 'unknown';
+}
+
+function normalizeIdentifier(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 function renderStrings(strings: StringInfo[]): string {

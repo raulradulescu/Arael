@@ -5,7 +5,8 @@ import type {
   AgentVariantSummary,
   BenchmarkRecord,
   BenchmarkRunResult,
-  LLMBenchmarkRecord
+  LLMBenchmarkRecord,
+  ReproducibilityMetadata
 } from '../../benchmark/types';
 import { badge, bar, collapsible, copyButton, searchBox, solvedOnlyToggle, statCard, table, type TableRow } from './components';
 import { escapeHtml } from './escape';
@@ -75,6 +76,7 @@ export function renderAgentBenchmarkHtml(
     ${renderAgentLeaderboard(result.summary.variants)}
     ${renderAgentRuns(result.records, opts.reportPath)}
     ${renderChallengeRollup(result.records)}
+    ${result.metadata ? renderReproducibility(result.metadata) : ''}
   </div>`;
 
   return renderHtmlDocument({ title, generatedAt, body });
@@ -285,6 +287,41 @@ function renderChallengeRollup(records: AgentBenchmarkRecord[]): string {
     <div class="section">
       <div class="section-header"><span class="section-icon">c</span><h2>Per-Challenge Rollup</h2></div>
       ${panels}
+    </div>
+  `;
+}
+
+function renderReproducibility(meta: ReproducibilityMetadata): string {
+  const rows: Array<[string, string]> = [
+    ['Generated', meta.generatedAt],
+    ['Arael version', meta.araelVersion],
+    ['Git commit', meta.gitCommit ?? '—'],
+    ['Node', meta.node],
+    ['Platform', `${meta.platform} ${meta.arch} (${meta.osType} ${meta.osRelease})`],
+    ['CPUs / Memory', `${meta.cpuCount} cores / ${meta.totalMemoryMb} MB`],
+    ['Working dir', meta.cwd],
+    ['Agents', meta.agents.join(', ')],
+    ['Runs / Concurrency', `${meta.runs} / ${meta.concurrency}`],
+    ['Timeout', `${meta.timeoutSeconds}s`],
+    ['Ollama URL', meta.ollamaUrl],
+    ['Prompt source', meta.promptSource],
+    ['Prompt sha256', meta.promptSha256],
+    ['Pricing file', meta.pricingFile ?? '—'],
+    ['Pricing sha256', meta.pricingSha256 ?? '—'],
+    ['Ground truth file', meta.groundTruthFile ?? '—'],
+    ['Ground truth sha256', meta.groundTruthSha256 ?? '—'],
+    ['GHIDRA_PATH', meta.ghidraPath ?? '—'],
+    ['ARAEL_PYTHON', meta.araelPython ?? '—'],
+    ['Arael server', meta.araelServerPath ?? '—']
+  ];
+  const body = table(
+    ['Field', 'Value'],
+    rows.map(([key, value]) => [escapeHtml(key), `<span class="mono">${escapeHtml(value)}</span>`])
+  );
+  return `
+    <div class="section">
+      <div class="section-header"><span class="section-icon">i</span><h2>Run Environment</h2></div>
+      ${collapsible('Reproducibility metadata', body, false)}
     </div>
   `;
 }

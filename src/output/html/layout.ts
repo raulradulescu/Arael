@@ -345,6 +345,52 @@ function baseStyles(): string {
       background: var(--bg-tertiary);
     }
     .collapsible-body { padding: 1rem; }
+    .function-details { display: grid; gap: 0.75rem; }
+    .function-detail { scroll-margin-top: 1rem; }
+    .function-detail summary {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .function-meta { margin-bottom: 1rem; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .compact-card { padding: 1rem; }
+    .link-list {
+      list-style: none;
+      margin: 0.75rem 0 0;
+      padding: 0;
+      display: grid;
+      gap: 0.35rem;
+    }
+    .code-block,
+    .hexdump-block {
+      margin: 0;
+      max-height: 520px;
+      overflow: auto;
+      white-space: pre;
+      tab-size: 2;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      color: var(--text);
+      font-family: "SF Mono", Consolas, monospace;
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+    .hexdump-block { color: var(--text-muted); }
+    .error-block { color: var(--danger); }
+    .analysis-note {
+      margin-top: 1rem;
+      color: var(--text-muted);
+    }
+    .analysis-note p { margin: 0.35rem 0 0; }
     .muted { color: var(--text-muted); }
     .danger { color: var(--danger); }
     .warn { color: var(--warning); }
@@ -389,8 +435,8 @@ function baseScript(): string {
         return row.textContent.toLowerCase();
       }
       function applyFilters(tableId) {
-        var table = document.getElementById(tableId);
-        if (!table) return;
+        var target = document.getElementById(tableId);
+        if (!target) return;
         var searchInputs = document.querySelectorAll('[data-search-target="' + tableId + '"]');
         var solvedToggles = document.querySelectorAll('[data-solved-toggle="' + tableId + '"]');
         var query = '';
@@ -402,11 +448,18 @@ function baseScript(): string {
         solvedToggles.forEach(function (toggle) {
           solvedOnly = solvedOnly || toggle.checked;
         });
-        table.querySelectorAll('tbody tr').forEach(function (row) {
-          var matchesQuery = !query || textFor(row).indexOf(query) !== -1;
-          var matchesSolved = !solvedOnly || row.getAttribute('data-solved') === 'true';
-          row.style.display = matchesQuery && matchesSolved ? '' : 'none';
-        });
+        if (target.tagName && target.tagName.toLowerCase() === 'table') {
+          target.querySelectorAll('tbody tr').forEach(function (row) {
+            var matchesQuery = !query || textFor(row).indexOf(query) !== -1;
+            var matchesSolved = !solvedOnly || row.getAttribute('data-solved') === 'true';
+            row.style.display = matchesQuery && matchesSolved ? '' : 'none';
+          });
+        } else {
+          target.querySelectorAll('[data-search-item]').forEach(function (item) {
+            var itemText = String(item.getAttribute('data-search-text') || item.textContent || '').toLowerCase();
+            item.style.display = !query || itemText.indexOf(query) !== -1 ? '' : 'none';
+          });
+        }
       }
       document.querySelectorAll('[data-search-target]').forEach(function (input) {
         input.addEventListener('input', function () {

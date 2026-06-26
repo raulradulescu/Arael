@@ -607,7 +607,7 @@ program
   .option('--archive-password <password>', 'Archive password for protected challenge zips')
   .option('--extract-output <dir>', 'Directory for extracted challenge archives')
   .option('-o, --output <file>', 'Write report to file instead of stdout')
-  .option('--format <format>', 'Report format: json|jsonl|csv|markdown|html', 'markdown')
+  .option('--format <format>', 'Report format: json|jsonl|csv|variant-csv|markdown|html', 'markdown')
   .option('--agents <spec>', 'Comma-separated specs like codex:gpt-5.5,claude:claude-opus-4-8+arael,ollama:qwen3.5:4b (append +arael to attach the Arael MCP server; ignored for ollama)')
   .option('--timeout <seconds>', 'Timeout per agent/challenge run', '1800')
   .option('--max-challenges <n>', 'Limit number of challenge directories')
@@ -959,7 +959,7 @@ function parseBenchmarkFormat(value: string): BenchmarkFormat {
 }
 
 function parseAgentBenchmarkFormat(value: string): AgentBenchmarkFormat {
-  if (value === 'json' || value === 'jsonl' || value === 'csv' || value === 'markdown' || value === 'html') {
+  if (value === 'json' || value === 'jsonl' || value === 'csv' || value === 'variant-csv' || value === 'markdown' || value === 'html') {
     return value;
   }
   throw new Error(`Invalid agent benchmark format: ${value}`);

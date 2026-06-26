@@ -3,7 +3,7 @@ import type { LLMResponse } from '../llm/provider';
 import type { YaraScanResult } from '../utils/yara';
 
 export type BenchmarkFormat = 'json' | 'jsonl' | 'csv' | 'markdown' | 'latex' | 'html';
-export type AgentBenchmarkFormat = 'json' | 'jsonl' | 'csv' | 'markdown' | 'html';
+export type AgentBenchmarkFormat = 'json' | 'jsonl' | 'csv' | 'variant-csv' | 'markdown' | 'html';
 export type AgentEngine = 'codex' | 'claude' | 'gemini' | 'ollama';
 
 export type BenchmarkMetricName =
@@ -308,6 +308,31 @@ export interface ChallengeTarget {
   totalBytes: number;
 }
 
+/** One run's artifact paths (relative to the manifest's outputRoot). */
+export interface ArtifactManifestEntry {
+  challengeId: string;
+  agent: AgentEngine;
+  model: string;
+  araelMcp: boolean;
+  variant: string;
+  runIndex: number;
+  success: boolean;
+  solved: boolean;
+  flag: string | null;
+  stdout: string | null;
+  stderr: string | null;
+  record: string | null;
+}
+
+/** Maps every benchmark run to its stdout/stderr/record artifacts for reliable linking. */
+export interface ArtifactManifest {
+  runId: string;
+  timestamp: string;
+  generatedAt: string;
+  outputRoot: string;
+  entries: ArtifactManifestEntry[];
+}
+
 export interface AgentBenchmarkRecord {
   runId: string;
   timestamp: string;
@@ -382,4 +407,39 @@ export interface AgentBenchmarkRunResult {
   challenges: ChallengeTarget[];
   records: AgentBenchmarkRecord[];
   summary: AgentBenchmarkSummary;
+  /** Environment/config snapshot for reproducibility (optional for legacy callers). */
+  metadata?: ReproducibilityMetadata;
+}
+
+/**
+ * A snapshot of everything needed to reproduce a benchmark run: tool versions,
+ * git commit, OS/hardware, run configuration, and content hashes of external
+ * inputs (prompt, pricing table, ground truth).
+ */
+export interface ReproducibilityMetadata {
+  generatedAt: string;
+  araelVersion: string;
+  gitCommit: string | null;
+  node: string;
+  platform: string;
+  arch: string;
+  osType: string;
+  osRelease: string;
+  cpuCount: number;
+  totalMemoryMb: number;
+  cwd: string;
+  agents: string[];
+  runs: number;
+  concurrency: number;
+  timeoutSeconds: number;
+  ollamaUrl: string;
+  promptSource: string;
+  promptSha256: string;
+  pricingFile: string | null;
+  pricingSha256: string | null;
+  groundTruthFile: string | null;
+  groundTruthSha256: string | null;
+  ghidraPath: string | null;
+  araelPython: string | null;
+  araelServerPath: string | null;
 }

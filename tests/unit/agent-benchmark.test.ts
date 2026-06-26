@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { detectFlags, extractAgentTokenUsage, parseAgentSpecs, runAgentBenchmark } from '../../src/benchmark/agent-runner';
+import { buildArtifactManifest, detectFlags, extractAgentTokenUsage, parseAgentSpecs, runAgentBenchmark } from '../../src/benchmark/agent-runner';
+import type { AgentBenchmarkRecord } from '../../src/benchmark/types';
 import { formatAgentBenchmarkResult } from '../../src/benchmark/reporters';
 
 describe('agent benchmark', () => {
@@ -96,6 +97,12 @@ describe('agent benchmark', () => {
     expect(result.records[0]?.command.join(' ')).toContain('probe-model');
     expect(result.records[1]?.command.join(' ')).toContain('probe-model');
     expect(result.records[1]?.command.join(' ')).toContain('--output-format json');
+
+    // Reproducibility metadata is captured for every run.
+    expect(result.metadata?.agents).toEqual(['codex:probe-model', 'claude:probe-model']);
+    expect(result.metadata?.promptSource).toBe('default');
+    expect(result.metadata?.promptSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(typeof result.metadata?.araelVersion).toBe('string');
   });
 
   it('expands cells by run count and reports variant summaries', async () => {
@@ -180,6 +187,10 @@ describe('agent benchmark', () => {
     expect(formatAgentBenchmarkResult(result, 'jsonl')).toContain('"agent"');
     expect(formatAgentBenchmarkResult(result, 'csv')).toContain('challenge_id');
     expect(formatAgentBenchmarkResult(result, 'csv')).toContain('cost_usd');
+    const variantCsv = formatAgentBenchmarkResult(result, 'variant-csv');
+    expect(variantCsv).toContain('solve_rate');
+    expect(variantCsv).toContain('cost_per_solve');
+    expect(variantCsv).toContain('codex:test-model');
     expect(formatAgentBenchmarkResult(result, 'markdown')).toContain('# Arael Agent Benchmark Report');
     expect(formatAgentBenchmarkResult(result, 'markdown')).toContain('Leaderboard (by variant)');
     expect(formatAgentBenchmarkResult(result, 'markdown')).toContain('Solve Rate');
@@ -192,6 +203,49 @@ describe('agent benchmark', () => {
     expect(detectFlags('the flag is th1s_1s_t3h@flare-on.com nice')).toEqual(['th1s_1s_t3h@flare-on.com']);
     expect(detectFlags('candidate flag{some_value_123}')).toEqual(['flag{some_value_123}']);
     expect(detectFlags('no flags here')).toEqual([]);
+  });
+
+  it('builds an artifact manifest with paths relative to the output root', () => {
+    const outputRoot = path.join(os.tmpdir(), 'run-abc.artifacts');
+    const stdoutPath = path.join(outputRoot, '1_-_sample', 'codex-gpt-arael.stdout.txt');
+    const record: AgentBenchmarkRecord = {
+      runId: 'run-1',
+      timestamp: '2026-01-01T00:00:00.000Z',
+      challengeId: '1 - sample',
+      challengePath: '/tmp/1 - sample',
+      agent: 'codex',
+      model: 'gpt',
+      araelMcp: true,
+      runIndex: 0,
+      command: ['codex', 'exec'],
+      success: true,
+      exitCode: 0,
+      timedOut: false,
+      durationSeconds: 12,
+      inputTokens: 100,
+      outputTokens: 50,
+      totalTokens: 150,
+      costUsd: 0.02,
+      flag: 'win@flare-on.com',
+      flagFound: true,
+      flagCorrect: true,
+      stdoutPath,
+      stderrPath: stdoutPath.replace('.stdout.txt', '.stderr.txt'),
+      outputPreview: 'win@flare-on.com',
+      errorMessage: null,
+      resumed: false,
+      dryRun: false
+    };
+
+    const manifest = buildArtifactManifest(outputRoot, 'run-1', '2026-01-01T00:00:00.000Z', [record]);
+
+    expect(manifest.entries).toHaveLength(1);
+    const entry = manifest.entries[0]!;
+    expect(entry.variant).toBe('codex:gpt+arael');
+    expect(entry.solved).toBe(true);
+    expect(entry.stdout).toBe('1_-_sample/codex-gpt-arael.stdout.txt');
+    expect(entry.stderr).toBe('1_-_sample/codex-gpt-arael.stderr.txt');
+    expect(entry.record).toBe('1_-_sample/codex-gpt-arael.record.json');
   });
 
   it('extracts token usage from agent output', () => {

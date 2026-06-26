@@ -5,6 +5,7 @@ import { spawn } from 'child_process';
 import { expandArchives, isArchivePath } from './archives';
 import { loadPricingTable } from './manifest';
 import { calculateCost } from './llm';
+import { collectReproducibilityMetadata } from './metadata';
 import type {
   AgentBenchmarkOptions,
   AgentBenchmarkRecord,
@@ -13,6 +14,7 @@ import type {
   AgentEngine,
   AgentSpec,
   AgentVariantSummary,
+  ArtifactManifest,
   ChallengeTarget,
   PricingTable
 } from './types';
@@ -173,13 +175,86 @@ export async function runAgentBenchmark(options: AgentBenchmarkOptions): Promise
 
   await Promise.all(Array.from({ length: Math.min(concurrency, cells.length || 1) }, worker));
 
+  const metadata = collectReproducibilityMetadata({
+    generatedAt: timestamp,
+    promptSource: options.promptPath ?? 'default',
+    promptText: prompt,
+    pricingFile: options.pricingFile,
+    groundTruthFile: options.groundTruthPath,
+    agents: options.agents.map(agent => `${agent.engine}:${agent.model}${agent.araelMcp ? '+arael' : ''}`),
+    runs,
+    concurrency,
+    timeoutSeconds: options.timeoutSeconds,
+    ollamaUrl: options.ollamaUrl,
+    araelServerPath: wiring?.serverPath ?? options.araelServerPath
+  });
+
+  // Write a manifest mapping each real run to its artifacts (skip pure dry runs,
+  // which produce no files). Makes HTML links and later analysis robust.
+  if (records.some(record => !record.dryRun)) {
+    writeArtifactManifest(outputRoot, runId, timestamp, records);
+  }
+
   return {
     runId,
     timestamp,
     challenges,
     records,
-    summary: summarizeAgentBenchmark(challenges, options.agents, records)
+    summary: summarizeAgentBenchmark(challenges, options.agents, records),
+    metadata
   };
+}
+
+/** Build the artifact manifest object (pure; paths are relative to outputRoot). */
+export function buildArtifactManifest(
+  outputRoot: string,
+  runId: string,
+  timestamp: string,
+  records: AgentBenchmarkRecord[]
+): ArtifactManifest {
+  const relative = (target: string | null): string | null =>
+    target === null ? null : path.relative(outputRoot, target).replace(/\\/g, '/');
+
+  return {
+    runId,
+    timestamp,
+    generatedAt: new Date().toISOString(),
+    outputRoot,
+    entries: records.map(record => ({
+      challengeId: record.challengeId,
+      agent: record.agent,
+      model: record.model,
+      araelMcp: record.araelMcp,
+      variant: `${record.agent}:${record.model}${record.araelMcp ? '+arael' : ''}`,
+      runIndex: record.runIndex,
+      success: record.success,
+      solved: isSolved(record),
+      flag: record.flag,
+      stdout: relative(record.stdoutPath),
+      stderr: relative(record.stderrPath),
+      record: relative(recordPathFromStdout(record.stdoutPath))
+    }))
+  };
+}
+
+function writeArtifactManifest(
+  outputRoot: string,
+  runId: string,
+  timestamp: string,
+  records: AgentBenchmarkRecord[]
+): void {
+  const manifest = buildArtifactManifest(outputRoot, runId, timestamp, records);
+  fs.writeFileSync(path.join(outputRoot, 'manifest.json'), JSON.stringify(manifest, null, 2));
+}
+
+/** Derive the per-cell record.json path from its stdout path (mirrors the artifact naming). */
+function recordPathFromStdout(stdoutPath: string | null): string | null {
+  if (stdoutPath === null) {
+    return null;
+  }
+  return stdoutPath.endsWith('.stdout.txt')
+    ? `${stdoutPath.slice(0, -'.stdout.txt'.length)}.record.json`
+    : `${stdoutPath}.record.json`;
 }
 
 /** Load a challengeId -> expected flag(s) map from a JSON ground-truth file. */
