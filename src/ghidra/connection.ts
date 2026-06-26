@@ -12,6 +12,7 @@ export interface ConnectionConfig {
   bridgePort?: number;
   pythonPath?: string;
   preferBridge?: boolean;
+  timeout?: number;
 }
 
 /**
@@ -39,7 +40,7 @@ export class GhidraConnection {
       port: config.bridgePort,
       pythonPath: config.pythonPath
     });
-    this.headless = new GhidraHeadless({ ghidraPath: config.ghidraPath });
+    this.headless = new GhidraHeadless({ ghidraPath: config.ghidraPath, timeout: config.timeout });
   }
 
   /**

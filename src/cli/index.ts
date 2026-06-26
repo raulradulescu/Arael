@@ -20,12 +20,14 @@ import { logger } from '../utils/logger';
 import { loadEnvFromFile } from '../utils/env';
 import { startShell } from './shell';
 import { scan, isYaraInstalled, getAvailableCategories, getAvailableRuleSets, isRLRulesAvailable, getRLRuleStats } from '../utils/yara';
-import { extractIOCs, countIOCs } from '../analysis/ioc-extractor';
-import { detectBehaviors, assessBehaviorRisk, classifyBinaryType } from '../analysis/behavior-detector';
-import { mapToATTACK } from '../analysis/mitre-mapper';
-import { assessImportRisk } from '../analysis/import-database';
-import { createProvider, getAvailableProviders, LLMProviderConfig } from '../llm/provider';
-import { SYSTEM_PROMPT, formatQuestion, expandQuestion, QUESTION_TEMPLATES } from '../llm/prompts';
+import { getAvailableProviders } from '../llm/provider';
+import { QUESTION_TEMPLATES } from '../llm/prompts';
+import { buildAnalysisContext } from '../llm/context';
+import { runAskQuestion } from '../llm/ask-runner';
+import { runBenchmark } from '../benchmark/runner';
+import { runAgentBenchmark, parseAgentSpecs } from '../benchmark/agent-runner';
+import { formatBenchmarkResult, formatAgentBenchmarkResult } from '../benchmark/reporters';
+import type { AgentBenchmarkFormat, BenchmarkFormat } from '../benchmark/types';
 
 loadEnvFromFile();
 
@@ -78,83 +80,7 @@ program
       logger.userMessage('Generating LLM context (analyzing binary)...');
       const result = await analyzeHandler({ filepath });
 
-      // Extract data for analysis
-      const importNames = result.imports.map(i => i.name);
-      const stringValues = result.strings.map(s => s.value);
-
-      // Run v2.6 analysis modules
-      const behaviors = detectBehaviors(importNames, stringValues);
-      const behaviorRisk = assessBehaviorRisk(behaviors);
-      const classification = classifyBinaryType(behaviors);
-      const iocs = extractIOCs(stringValues);
-      const mitreMapping = mapToATTACK(behaviors);
-      const importRisk = assessImportRisk(importNames);
-
-      // Build LLM context
-      const context = {
-        summary: generateContextSummary(result, classification, behaviorRisk),
-        classification: {
-          type: classification.classification,
-          malwareType: classification.malwareType,
-          confidence: classification.confidence,
-          reasoning: classification.reasoning,
-        },
-        binary: {
-          filename: result.binary.filename,
-          format: result.binary.format,
-          architecture: result.binary.architecture,
-          bits: result.binary.bits,
-          size: result.binary.size,
-          isPacked: result.binary.packing?.isPacked ?? false,
-          entropy: result.binary.packing?.entropy?.overall,
-        },
-        behaviors: behaviors.map(b => ({
-          id: b.id,
-          category: b.category,
-          description: b.description,
-          riskLevel: b.riskLevel,
-          evidence: b.evidence.slice(0, 5),
-        })),
-        riskAssessment: {
-          overall: behaviorRisk.overallRisk,
-          importRisk: importRisk.overallRisk,
-          criticalBehaviors: behaviorRisk.criticalBehaviors,
-        },
-        iocs: {
-          ips: iocs.ips,
-          domains: iocs.domains,
-          urls: iocs.urls,
-          registryKeys: iocs.registryKeys,
-          filePaths: iocs.filePaths.slice(0, 10),
-        },
-        mitreAttack: {
-          tactics: mitreMapping.tactics,
-          techniques: mitreMapping.techniques.slice(0, 10).map(t => ({
-            id: t.id,
-            name: t.name,
-            confidence: t.confidence,
-          })),
-          summary: mitreMapping.summary,
-        },
-        keyFunctions: result.functions
-          .filter(f => !f.isThunk && !f.isExternal)
-          .sort((a, b) => b.size - a.size)
-          .slice(0, 15)
-          .map(f => ({
-            name: f.name,
-            address: f.address,
-            size: f.size,
-          })),
-        suggestedAnalysis: generateSuggestedAnalysis(behaviors, iocs, classification),
-        stats: {
-          functions: result.functions.length,
-          strings: result.strings.length,
-          imports: result.imports.length,
-          behaviorsDetected: behaviors.length,
-          iocsFound: countIOCs(iocs),
-          techniquesMatched: mitreMapping.techniques.length,
-        },
-      };
+      const context = buildAnalysisContext(result);
 
       if (options.json) {
         console.log(JSON.stringify(context, null, 2));
@@ -285,37 +211,18 @@ program
       logger.userMessage('Analyzing binary...');
       const result = await analyzeHandler({ filepath });
 
-      // Expand question template if used
-      const question = expandQuestion(options.question);
-
-      // Create provider
-      const providerConfig: Partial<LLMProviderConfig> = {};
-      if (options.provider) {
-        providerConfig.provider = options.provider as 'openai' | 'anthropic' | 'google' | 'ollama';
-      }
-      if (options.model) {
-        providerConfig.model = options.model;
-      }
-
-      const provider = createProvider(providerConfig);
-      const isAvailable = await provider.isAvailable();
-      if (!isAvailable) {
-        console.error(`Error: Provider '${provider.name}' is not available. Use --list-providers to check.`);
-        process.exit(1);
-      }
-
-      logger.userMessage(`Querying ${provider.name}...`);
-
-      // Build context and query
-      const formattedQuestion = formatQuestion(question, result);
-      const response = await provider.chat([
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: formattedQuestion }
-      ]);
+      logger.userMessage('Querying LLM...');
+      const askResult = await runAskQuestion({
+        result,
+        question: options.question,
+        provider: options.provider as 'openai' | 'anthropic' | 'google' | 'ollama' | undefined,
+        model: options.model
+      });
+      const { question, response } = askResult;
 
       // Output
       console.log('\n' + '='.repeat(70));
-      console.log(`ARAEL ASK (${provider.name}/${response.model})`);
+      console.log(`ARAEL ASK (${response.provider}/${response.model})`);
       console.log('='.repeat(70));
       console.log(`\nQuestion: ${question}\n`);
       console.log(response.content);
@@ -620,6 +527,161 @@ program
   });
 
 program
+  .command('benchmark <target>')
+  .description('Run thesis-grade benchmarks over a binary, glob, directory, or manifest corpus')
+  .option('--manifest <file>', 'Ground-truth manifest JSON file')
+  .option('-o, --output <file>', 'Write report to file instead of stdout')
+  .option('--format <format>', 'Report format: json|jsonl|csv|markdown|latex', 'json')
+  .option('-f, --force', 'Bypass cache for the first run of each sample')
+  .option('--runs <n>', 'Number of runs per sample', '1')
+  .option('--timeout <seconds>', 'Headless analysis timeout in seconds')
+  .option('--include-yara', 'Run built-in and ReversingLabs YARA rules when available')
+  .option('--with-llm', 'Run configured LLM questions for each successful sample')
+  .option('-p, --provider <name>', 'LLM provider: openai, anthropic, google, ollama')
+  .option('-m, --model <name>', 'LLM model name')
+  .option('--questions <file>', 'JSON file containing benchmark LLM questions')
+  .option('--pricing-file <file>', 'JSON pricing table for optional LLM cost calculation')
+  .action(async (target: string, options: {
+    manifest?: string;
+    output?: string;
+    format?: string;
+    force?: boolean;
+    runs?: string;
+    timeout?: string;
+    includeYara?: boolean;
+    withLlm?: boolean;
+    provider?: string;
+    model?: string;
+    questions?: string;
+    pricingFile?: string;
+  }) => {
+    try {
+      const format = parseBenchmarkFormat(options.format ?? 'json');
+      const runs = parsePositiveInt(options.runs ?? '1', '--runs');
+      const timeoutSeconds = options.timeout ? parsePositiveInt(options.timeout, '--timeout') : undefined;
+
+      await initConnection(timeoutSeconds ? timeoutSeconds * 1000 : undefined);
+      const result = await runBenchmark({
+        target,
+        manifestPath: options.manifest,
+        outputPath: options.output,
+        format,
+        force: Boolean(options.force),
+        runs,
+        timeoutSeconds,
+        includeYara: Boolean(options.includeYara),
+        withLlm: Boolean(options.withLlm),
+        provider: options.provider as 'openai' | 'anthropic' | 'google' | 'ollama' | undefined,
+        model: options.model,
+        questionsPath: options.questions,
+        pricingFile: options.pricingFile
+      });
+
+      const rendered = formatBenchmarkResult(result, format);
+      if (options.output) {
+        fs.writeFileSync(options.output, rendered);
+        console.log(`Benchmark report written to: ${options.output}`);
+      } else {
+        process.stdout.write(rendered);
+      }
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('benchmark-agents <target>')
+  .description('Run external Codex/Claude agents against challenge directories for reversing benchmarks')
+  .option('--extract-archives', 'Extract zip/7z archives before collecting challenge directories')
+  .option('--archive-password <password>', 'Archive password for protected challenge zips')
+  .option('--extract-output <dir>', 'Directory for extracted challenge archives')
+  .option('-o, --output <file>', 'Write report to file instead of stdout')
+  .option('--format <format>', 'Report format: json|jsonl|csv|markdown', 'markdown')
+  .option('--agents <spec>', 'Comma-separated specs like codex:gpt-5.5,claude:claude-opus-4-8+arael,ollama:qwen3.5:4b (append +arael to attach the Arael MCP server; ignored for ollama)')
+  .option('--timeout <seconds>', 'Timeout per agent/challenge run', '1800')
+  .option('--max-challenges <n>', 'Limit number of challenge directories')
+  .option('--runs <n>', 'Repeat each agent/challenge cell N times for variance', '1')
+  .option('--concurrency <n>', 'Max agent processes to run in parallel', '1')
+  .option('--force', 'Re-run cells even if a cached per-cell record exists')
+  .option('--pricing <file>', 'JSON pricing table for per-run USD cost estimates')
+  .option('--ground-truth <file>', 'JSON map of challengeId -> expected flag(s) for auto-grading')
+  .option('--codex-bin <path>', 'Codex executable', 'codex')
+  .option('--claude-bin <path>', 'Claude executable', 'claude')
+  .option('--gemini-bin <path>', 'Gemini executable', 'gemini')
+  .option('--ollama-host <url>', 'Ollama server base URL for ollama:* local-model instances', 'http://localhost:11434')
+  .option('--arael-server <path>', 'Arael MCP server entrypoint for +arael instances (default: bundled dist/mcp/server.js)')
+  .option('--prompt <file>', 'Custom prompt file for agent runs')
+  .option('--dry-run', 'Collect targets and commands without invoking agents')
+  .action(async (target: string, options: {
+    extractArchives?: boolean;
+    archivePassword?: string;
+    extractOutput?: string;
+    output?: string;
+    format?: string;
+    agents?: string;
+    timeout?: string;
+    maxChallenges?: string;
+    runs?: string;
+    concurrency?: string;
+    force?: boolean;
+    pricing?: string;
+    groundTruth?: string;
+    codexBin?: string;
+    claudeBin?: string;
+    geminiBin?: string;
+    ollamaHost?: string;
+    araelServer?: string;
+    prompt?: string;
+    dryRun?: boolean;
+  }) => {
+    try {
+      const format = parseAgentBenchmarkFormat(options.format ?? 'markdown');
+      const timeoutSeconds = parsePositiveInt(options.timeout ?? '1800', '--timeout');
+      const maxChallenges = options.maxChallenges
+        ? parsePositiveInt(options.maxChallenges, '--max-challenges')
+        : undefined;
+      const runs = parsePositiveInt(options.runs ?? '1', '--runs');
+      const concurrency = parsePositiveInt(options.concurrency ?? '1', '--concurrency');
+
+      const result = await runAgentBenchmark({
+        target,
+        outputPath: options.output,
+        format,
+        agents: parseAgentSpecs(options.agents),
+        timeoutSeconds,
+        extractArchives: Boolean(options.extractArchives),
+        archivePassword: options.archivePassword,
+        extractOutput: options.extractOutput,
+        maxChallenges,
+        runs,
+        concurrency,
+        force: Boolean(options.force),
+        pricingFile: options.pricing,
+        groundTruthPath: options.groundTruth,
+        codexBin: options.codexBin ?? 'codex',
+        claudeBin: options.claudeBin ?? 'claude',
+        geminiBin: options.geminiBin ?? 'gemini',
+        ollamaUrl: options.ollamaHost ?? 'http://localhost:11434',
+        araelServerPath: options.araelServer,
+        promptPath: options.prompt,
+        dryRun: Boolean(options.dryRun)
+      });
+
+      const rendered = formatAgentBenchmarkResult(result, format);
+      if (options.output) {
+        fs.writeFileSync(options.output, rendered);
+        console.log(`Agent benchmark report written to: ${options.output}`);
+      } else {
+        process.stdout.write(rendered);
+      }
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  });
+
+program
   .command('report <filepath>')
   .description('Generate a standalone HTML report with stats, top functions, and strings')
   .option('-o, --output <file>', 'Output HTML file', 'report.html')
@@ -773,7 +835,7 @@ program
   });
 
 // Helper functions
-async function initConnection(): Promise<void> {
+async function initConnection(timeoutMs?: number): Promise<void> {
   const ghidraPath = process.env['GHIDRA_PATH'] ?? '';
   const bridgePortValue = process.env['GHIDRA_BRIDGE_PORT'];
   const bridgePort = bridgePortValue ? parseInt(bridgePortValue, 10) : undefined;
@@ -781,7 +843,8 @@ async function initConnection(): Promise<void> {
     ghidraPath,
     bridgeHost: process.env['GHIDRA_BRIDGE_HOST'],
     bridgePort,
-    pythonPath: process.env['ARAEL_PYTHON'] ?? process.env['PYTHON_PATH']
+    pythonPath: process.env['ARAEL_PYTHON'] ?? process.env['PYTHON_PATH'],
+    timeout: timeoutMs
   });
   await connection.connect();
 }
@@ -798,6 +861,28 @@ function outputResult(result: unknown, format?: string): void {
   } else {
     console.log(JSON.stringify(result, null, 2));
   }
+}
+
+function parseBenchmarkFormat(value: string): BenchmarkFormat {
+  if (value === 'json' || value === 'jsonl' || value === 'csv' || value === 'markdown' || value === 'latex') {
+    return value;
+  }
+  throw new Error(`Invalid benchmark format: ${value}`);
+}
+
+function parseAgentBenchmarkFormat(value: string): AgentBenchmarkFormat {
+  if (value === 'json' || value === 'jsonl' || value === 'csv' || value === 'markdown') {
+    return value;
+  }
+  throw new Error(`Invalid agent benchmark format: ${value}`);
+}
+
+function parsePositiveInt(value: string, optionName: string): number {
+  const parsed = parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${optionName} must be a positive integer`);
+  }
+  return parsed;
 }
 
 function generateHtmlReport(result: import('../output/schema').AnalysisResult, title?: string): string {
@@ -842,13 +927,14 @@ function generateHtmlReport(result: import('../output/schema').AnalysisResult, t
   const hasHighRisk = highRiskCaps.some(c => capabilities.has(c));
   const hasMediumRisk = mediumRiskCaps.some(c => capabilities.has(c));
   const riskLevel = hasHighRisk ? 'high' : hasMediumRisk ? 'medium' : 'low';
-  const riskColors = { high: '#e74c3c', medium: '#f39c12', low: '#4ecca3' };
 
   // Section entropy analysis
-  const sections = result.binary.sections ?? [];
+  const sections = result.sections ?? [];
+  const sectionPermissions = (section: import('../output/schema').SectionInfo): string =>
+    `${section.permissions.read ? 'r' : '-'}${section.permissions.write ? 'w' : '-'}${section.permissions.execute ? 'x' : '-'}`;
   const suspiciousSections = sections.filter(s =>
     (s.entropy && s.entropy > 7.0) ||
-    (s.permissions?.includes('x') && s.permissions?.includes('w'))
+    (s.permissions.write && s.permissions.execute)
   );
 
   // Exports count
@@ -1255,11 +1341,11 @@ function generateHtmlReport(result: import('../output/schema').AnalysisResult, t
           <thead><tr><th>Name</th><th>Virtual Address</th><th>Size</th><th>Permissions</th><th>Entropy</th></tr></thead>
           <tbody>
             ${sections.slice(0, 20).map(s => `
-              <tr${(s.entropy && s.entropy > 7.0) || (s.permissions?.includes('x') && s.permissions?.includes('w')) ? ' class="suspicious"' : ''}>
+              <tr${(s.entropy && s.entropy > 7.0) || (s.permissions.write && s.permissions.execute) ? ' class="suspicious"' : ''}>
                 <td><code>${s.name}</code></td>
-                <td><code>${s.virtualAddress ?? '-'}</code></td>
+                <td><code>${s.start ?? '-'}</code></td>
                 <td>${s.size?.toLocaleString() ?? '-'}</td>
-                <td><code>${s.permissions ?? '-'}</code></td>
+                <td><code>${sectionPermissions(s)}</code></td>
                 <td>${s.entropy?.toFixed(2) ?? '-'}${s.entropy && s.entropy > 7.0 ? ' <span class="suspicious">!</span>' : ''}</td>
               </tr>
             `).join('')}
@@ -1356,67 +1442,6 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
-
-function generateContextSummary(
-  result: import('../output/schema').AnalysisResult,
-  classification: { classification: string; malwareType?: string; confidence: number },
-  risk: { overallRisk: string; criticalBehaviors: string[] }
-): string {
-  const format = `${result.binary.format} ${result.binary.architecture} ${result.binary.bits}-bit`;
-  const packed = result.binary.packing?.isPacked ? 'packed ' : '';
-
-  if (classification.classification === 'malware') {
-    const type = classification.malwareType ?? 'malicious';
-    return `${packed}${format} executable classified as ${type} with ${(classification.confidence * 100).toFixed(0)}% confidence. ${risk.criticalBehaviors.length > 0 ? `Critical behaviors: ${risk.criticalBehaviors.slice(0, 2).join(', ')}.` : ''}`;
-  } else if (classification.classification === 'suspicious') {
-    return `${packed}${format} executable with suspicious characteristics. Risk level: ${risk.overallRisk}. Requires further analysis to confirm malicious intent.`;
-  } else {
-    return `${packed}${format} executable with ${result.functions.length} functions and ${result.imports.length} imports. No obvious malicious indicators detected.`;
-  }
-}
-
-function generateSuggestedAnalysis(
-  behaviors: Array<{ id: string; category: string; evidence: string[] }>,
-  iocs: { urls: string[]; ips: string[]; registryKeys: string[] },
-  classification: { classification: string; malwareType?: string }
-): string[] {
-  const suggestions: string[] = [];
-
-  if (classification.classification === 'malware' || classification.classification === 'suspicious') {
-    suggestions.push('Examine network-related functions for C2 communication patterns');
-  }
-
-  if (behaviors.some(b => b.id === 'process_injection')) {
-    suggestions.push('Analyze injection target selection and payload in WriteProcessMemory calls');
-  }
-
-  if (behaviors.some(b => b.id === 'persistence_registry')) {
-    suggestions.push('Check registry key values for persistence payload paths');
-  }
-
-  if (iocs.urls.length > 0) {
-    suggestions.push(`Investigate URLs: ${iocs.urls.slice(0, 2).join(', ')}`);
-  }
-
-  if (behaviors.some(b => b.id === 'credential_theft')) {
-    suggestions.push('Examine credential access functions for targeted applications');
-  }
-
-  if (behaviors.some(b => b.id === 'file_encryption')) {
-    suggestions.push('Analyze encryption routine and look for ransom note generation');
-  }
-
-  if (behaviors.some(b => b.category === 'defense_evasion')) {
-    suggestions.push('Review anti-analysis checks for sandbox/VM detection logic');
-  }
-
-  if (suggestions.length === 0) {
-    suggestions.push('Review main entry point and initialization routines');
-    suggestions.push('Examine string references for configuration data');
-  }
-
-  return suggestions.slice(0, 6);
 }
 
 program.parse();
