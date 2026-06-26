@@ -2,7 +2,7 @@
 
 **Reverse Engineering Assistant for Cybersecurity Professionals**
 
-[![Version](https://img.shields.io/badge/version-2.6.0-blue)]()
+[![Version](https://img.shields.io/badge/version-3.0.1-blue)]()
 [![Tests](https://img.shields.io/badge/tests-271%20passing-brightgreen)]()
 [![Ghidra](https://img.shields.io/badge/Ghidra-12.0-blue)]()
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)]()
@@ -143,6 +143,10 @@ arael callgraph ./binary --format mermaid --root main
 arael hexdump ./binary --address 0x401000 --length 128
 arael yara ./binary
 arael report ./binary --output report.html
+arael report --from-json ./analysis.json --output report.html
+arael report --from-cache <row-id-or-sha256> --output report.html --open
+arael cache --list
+arael benchmark-agents ./challenges --format html --output agent-run.html
 
 # LLM queries (v2.6)
 arael ask ./binary -q "Is this malicious?"
@@ -206,6 +210,31 @@ xrefs = await arael_xrefs({"filepath": "./binary", "address": "0x401000"})
 | `shell` | Interactive REPL | Commands: decompile, disasm, xrefs, etc. |
 | `batch` | Multi-binary analysis | JSON files per binary |
 | `report` | HTML report | Standalone HTML |
+
+### Reports and Cache
+`arael report` can render from a binary, a saved `AnalysisResult` JSON file, or the
+SQLite analysis cache. Cached and JSON reports do not start Ghidra.
+
+```bash
+arael report ./binary -o report.html
+arael report --from-json ./analysis.json -o report.html
+arael report --from-cache <row-id|cache-key|sha256|path> -o report.html --open
+arael report ./binary --cache-only -o report.html
+```
+
+Cache inspection:
+```bash
+arael cache --stats
+arael cache --list --limit 50
+arael cache --show <identifier> --json
+arael cache --export <identifier> -o analysis.json
+```
+
+Benchmark reports support HTML:
+```bash
+arael benchmark ./samples --format html -o benchmark.html
+arael benchmark-agents ./challenges --format html -o agent-benchmark.html
+```
 
 ### Security Analysis (v2.6)
 - **Behavior Detection**: Network client/server, process injection, credential theft, persistence, anti-debug, keylogging, file encryption

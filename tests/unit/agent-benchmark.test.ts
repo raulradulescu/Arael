@@ -5,20 +5,31 @@ import { detectFlags, extractAgentTokenUsage, parseAgentSpecs, runAgentBenchmark
 import { formatAgentBenchmarkResult } from '../../src/benchmark/reporters';
 
 describe('agent benchmark', () => {
-  it('parses default and explicit agent specs', () => {
-    expect(parseAgentSpecs()).toEqual([
-      { engine: 'claude', model: 'claude-opus-4-8', araelMcp: true },
-      { engine: 'claude', model: 'claude-opus-4-8', araelMcp: false },
-      { engine: 'codex', model: 'gpt-5.5', araelMcp: true },
-      { engine: 'codex', model: 'gpt-5.5', araelMcp: false },
-      { engine: 'gemini', model: 'gemini-3-pro', araelMcp: true },
-      { engine: 'gemini', model: 'gemini-3-pro', araelMcp: false }
-    ]);
+  it('parses default agent specs by shape, not pinned model versions', () => {
+    const defaults = parseAgentSpecs();
 
-    expect(parseAgentSpecs('codex:gpt-5.5,claude:opus+arael,gemini:gemini-3-pro')).toEqual([
-      { engine: 'codex', model: 'gpt-5.5', araelMcp: false },
-      { engine: 'claude', model: 'opus', araelMcp: true },
-      { engine: 'gemini', model: 'gemini-3-pro', araelMcp: false }
+    // Three cloud engines, each as an +arael / bare pair (6 instances).
+    expect(defaults).toHaveLength(6);
+    expect(defaults.map(spec => spec.engine)).toEqual([
+      'claude', 'claude', 'codex', 'codex', 'gemini', 'gemini'
+    ]);
+    expect(defaults.map(spec => spec.araelMcp)).toEqual([
+      true, false, true, false, true, false
+    ]);
+    // Every default carries a non-empty model string. We intentionally do NOT
+    // assert the exact version so bumping model defaults doesn't break tests.
+    expect(defaults.every(spec => typeof spec.model === 'string' && spec.model.length > 0)).toBe(true);
+    // Each engine's +arael and bare variants target the same model.
+    for (let i = 0; i < defaults.length; i += 2) {
+      expect(defaults[i]?.model).toBe(defaults[i + 1]?.model);
+    }
+  });
+
+  it('parses explicit agent specs', () => {
+    expect(parseAgentSpecs('codex:some-model,claude:some-model+arael,gemini:some-model')).toEqual([
+      { engine: 'codex', model: 'some-model', araelMcp: false },
+      { engine: 'claude', model: 'some-model', araelMcp: true },
+      { engine: 'gemini', model: 'some-model', araelMcp: false }
     ]);
 
     // Local model tags carry a colon (e.g. qwen3.5:4b) and never attach MCP.
@@ -66,7 +77,7 @@ describe('agent benchmark', () => {
     const result = await runAgentBenchmark({
       target: tempDir,
       format: 'markdown',
-      agents: parseAgentSpecs('codex:gpt-5.5,claude:claude-opus-4-8'),
+      agents: parseAgentSpecs('codex:probe-model,claude:probe-model'),
       timeoutSeconds: 30,
       extractArchives: false,
       runs: 1,
@@ -82,8 +93,8 @@ describe('agent benchmark', () => {
     expect(result.challenges).toHaveLength(1);
     expect(result.records).toHaveLength(2);
     expect(result.records.every(record => record.dryRun)).toBe(true);
-    expect(result.records[0]?.command.join(' ')).toContain('gpt-5.5');
-    expect(result.records[1]?.command.join(' ')).toContain('claude-opus-4-8');
+    expect(result.records[0]?.command.join(' ')).toContain('probe-model');
+    expect(result.records[1]?.command.join(' ')).toContain('probe-model');
     expect(result.records[1]?.command.join(' ')).toContain('--output-format json');
   });
 
@@ -173,6 +184,8 @@ describe('agent benchmark', () => {
     expect(formatAgentBenchmarkResult(result, 'markdown')).toContain('Leaderboard (by variant)');
     expect(formatAgentBenchmarkResult(result, 'markdown')).toContain('Solve Rate');
     expect(formatAgentBenchmarkResult(result, 'markdown')).toContain('Cost USD');
+    expect(formatAgentBenchmarkResult(result, 'html')).toContain('<!DOCTYPE html>');
+    expect(formatAgentBenchmarkResult(result, 'html')).toContain('Leaderboard');
   });
 
   it('detects flag-shaped tokens', () => {

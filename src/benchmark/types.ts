@@ -2,8 +2,8 @@ import type { AnalysisResult } from '../output/schema';
 import type { LLMResponse } from '../llm/provider';
 import type { YaraScanResult } from '../utils/yara';
 
-export type BenchmarkFormat = 'json' | 'jsonl' | 'csv' | 'markdown' | 'latex';
-export type AgentBenchmarkFormat = 'json' | 'jsonl' | 'csv' | 'markdown';
+export type BenchmarkFormat = 'json' | 'jsonl' | 'csv' | 'markdown' | 'latex' | 'html';
+export type AgentBenchmarkFormat = 'json' | 'jsonl' | 'csv' | 'markdown' | 'html';
 export type AgentEngine = 'codex' | 'claude' | 'gemini' | 'ollama';
 
 export type BenchmarkMetricName =

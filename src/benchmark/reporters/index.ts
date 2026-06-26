@@ -7,8 +7,18 @@ import type {
   BenchmarkRunResult,
   LLMBenchmarkRecord
 } from '../types';
+import { renderAgentBenchmarkHtml, renderBenchmarkHtml } from '../../output/html';
 
-export function formatBenchmarkResult(result: BenchmarkRunResult, format: BenchmarkFormat): string {
+export interface BenchmarkReportOptions {
+  outputPath?: string;
+  title?: string;
+}
+
+export function formatBenchmarkResult(
+  result: BenchmarkRunResult,
+  format: BenchmarkFormat,
+  options: BenchmarkReportOptions = {}
+): string {
   switch (format) {
     case 'json':
       return `${JSON.stringify(result, null, 2)}\n`;
@@ -20,12 +30,15 @@ export function formatBenchmarkResult(result: BenchmarkRunResult, format: Benchm
       return formatMarkdown(result);
     case 'latex':
       return formatLatex(result);
+    case 'html':
+      return renderBenchmarkHtml(result, { title: options.title });
   }
 }
 
 export function formatAgentBenchmarkResult(
   result: AgentBenchmarkRunResult,
-  format: AgentBenchmarkFormat
+  format: AgentBenchmarkFormat,
+  options: BenchmarkReportOptions = {}
 ): string {
   switch (format) {
     case 'json':
@@ -36,6 +49,11 @@ export function formatAgentBenchmarkResult(
       return formatAgentCsv(result);
     case 'markdown':
       return formatAgentMarkdown(result);
+    case 'html':
+      return renderAgentBenchmarkHtml(result, {
+        title: options.title,
+        reportPath: options.outputPath
+      });
   }
 }
 

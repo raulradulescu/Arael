@@ -50,6 +50,13 @@ export class AnalysisCache {
   }
 
   /**
+   * Return the SQLite database path used by this cache.
+   */
+  getDbPath(): string {
+    return this.dbPath;
+  }
+
+  /**
    * Get cached analysis result for a file.
    * Returns null if not found, file doesn't exist, or cache key doesn't match.
    */
@@ -77,6 +84,46 @@ export class AnalysisCache {
     }
 
     return null;
+  }
+
+  /**
+   * List cached analyses without returning the full stored JSON payload.
+   */
+  listEntries(limit = 20): AnalysisCacheEntrySummary[] {
+    const safeLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
+    const rows = this.db.prepare(`
+      SELECT
+        id,
+        cache_key as cacheKey,
+        file_hash as fileHash,
+        filepath,
+        ghidra_version as ghidraVersion,
+        arael_version as araelVersion,
+        created_at as createdAt,
+        accessed_at as accessedAt,
+        analysis_json as analysisJson
+      FROM analysis_cache
+      ORDER BY accessed_at DESC, created_at DESC, id DESC
+      LIMIT ?
+    `).all(safeLimit) as AnalysisCacheRow[];
+
+    return rows.map(row => this.rowToSummary(row));
+  }
+
+  /**
+   * Resolve a cached analysis by path, row id, cache key, SHA-256 file hash, or stored filepath.
+   */
+  getEntry(identifier: string): AnalysisCacheEntry | null {
+    const row = this.resolveEntryRow(identifier);
+    if (!row) {
+      return null;
+    }
+
+    this.db.prepare(
+      'UPDATE analysis_cache SET accessed_at = CURRENT_TIMESTAMP WHERE id = ?'
+    ).run(row.id);
+
+    return this.rowToEntry(row);
   }
 
   /**
@@ -168,6 +215,131 @@ export class AnalysisCache {
   close(): void {
     this.db.close();
   }
+
+  private resolveEntryRow(identifier: string): AnalysisCacheRow | null {
+    if (fs.existsSync(identifier)) {
+      try {
+        const cacheKey = cacheKeyToString(generateCacheKey(identifier));
+        return this.findRow('cache_key = ?', cacheKey);
+      } catch {
+        return null;
+      }
+    }
+
+    if (/^\d+$/.test(identifier)) {
+      const byId = this.findRow('id = ?', Number(identifier));
+      if (byId) {
+        return byId;
+      }
+    }
+
+    const byCacheKey = this.findRow('cache_key = ?', identifier);
+    if (byCacheKey) {
+      return byCacheKey;
+    }
+
+    if (/^[a-fA-F0-9]{64}$/.test(identifier)) {
+      const byFileHash = this.findRow('file_hash = ?', identifier.toLowerCase(), 'created_at DESC, id DESC');
+      if (byFileHash) {
+        return byFileHash;
+      }
+    }
+
+    return this.findRow('filepath = ?', identifier, 'created_at DESC, id DESC');
+  }
+
+  private findRow(whereSql: string, value: string | number, orderBy = 'id DESC'): AnalysisCacheRow | null {
+    const row = this.db.prepare(`
+      SELECT
+        id,
+        cache_key as cacheKey,
+        file_hash as fileHash,
+        filepath,
+        ghidra_version as ghidraVersion,
+        arael_version as araelVersion,
+        created_at as createdAt,
+        accessed_at as accessedAt,
+        analysis_json as analysisJson
+      FROM analysis_cache
+      WHERE ${whereSql}
+      ORDER BY ${orderBy}
+      LIMIT 1
+    `).get(value) as AnalysisCacheRow | undefined;
+
+    return row ?? null;
+  }
+
+  private rowToSummary(row: AnalysisCacheRow): AnalysisCacheEntrySummary {
+    const analysis = this.parseAnalysis(row.analysisJson);
+    return {
+      id: row.id,
+      cacheKey: row.cacheKey,
+      fileHash: row.fileHash,
+      filepath: row.filepath,
+      ghidraVersion: row.ghidraVersion,
+      araelVersion: row.araelVersion,
+      createdAt: row.createdAt,
+      accessedAt: row.accessedAt,
+      analysisId: analysis?.metadata.analysisId ?? null,
+      timestamp: analysis?.metadata.timestamp ?? null,
+      binaryFilename: analysis?.binary.filename ?? null,
+      format: analysis?.binary.format ?? null,
+      architecture: analysis?.binary.architecture ?? null,
+      functionCount: analysis?.functions.length ?? null,
+      stringCount: analysis?.strings.length ?? null,
+      importCount: analysis?.imports.length ?? null
+    };
+  }
+
+  private rowToEntry(row: AnalysisCacheRow): AnalysisCacheEntry {
+    return {
+      ...this.rowToSummary(row),
+      analysis: this.parseAnalysis(row.analysisJson) ?? JSON.parse(row.analysisJson) as AnalysisResult
+    };
+  }
+
+  private parseAnalysis(value: string): AnalysisResult | null {
+    try {
+      return JSON.parse(value) as AnalysisResult;
+    } catch {
+      return null;
+    }
+  }
+}
+
+interface AnalysisCacheRow {
+  id: number;
+  cacheKey: string;
+  fileHash: string;
+  filepath: string;
+  ghidraVersion: string;
+  araelVersion: string;
+  createdAt: string;
+  accessedAt: string;
+  analysisJson: string;
+}
+
+export interface AnalysisCacheEntrySummary {
+  id: number;
+  cacheKey: string;
+  fileHash: string;
+  filepath: string;
+  ghidraVersion: string;
+  araelVersion: string;
+  createdAt: string;
+  accessedAt: string;
+  analysisId: string | null;
+  timestamp: string | null;
+  binaryFilename: string | null;
+  format: string | null;
+  architecture: string | null;
+  functionCount: number | null;
+  stringCount: number | null;
+  importCount: number | null;
+}
+
+export interface AnalysisCacheEntry extends AnalysisCacheEntrySummary {
+  analysis: AnalysisResult;
 }
 
 // Singleton instance

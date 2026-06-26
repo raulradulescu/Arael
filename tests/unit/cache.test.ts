@@ -150,5 +150,53 @@ describe('Cache', () => {
         fs.unlinkSync(testFile);
       }
     });
+
+    it('should list cached entries with summary metadata', () => {
+      const testFile = path.join(tempDir, 'arael_test_list.bin');
+      fs.writeFileSync(testFile, 'test content');
+
+      try {
+        cache.set(testFile, mockResult);
+        const entries = cache.listEntries(10);
+
+        expect(entries).toHaveLength(1);
+        expect(entries[0]?.binaryFilename).toBe('test.bin');
+        expect(entries[0]?.analysisId).toBe('test-id');
+        expect(entries[0]?.functionCount).toBe(0);
+      } finally {
+        fs.unlinkSync(testFile);
+      }
+    });
+
+    it('should resolve cached entries by path, id, cache key, file hash, and deleted stored filepath', () => {
+      const testFile = path.join(tempDir, 'arael_test_resolve.bin');
+      fs.writeFileSync(testFile, 'test content');
+      const cacheKey = generateCacheKey(testFile);
+      const cacheKeyString = cacheKeyToString(cacheKey);
+
+      try {
+        cache.set(testFile, mockResult);
+
+        const byPath = cache.getEntry(testFile);
+        expect(byPath?.analysis.metadata.analysisId).toBe('test-id');
+
+        const first = cache.listEntries(1)[0];
+        expect(first).toBeDefined();
+        if (!first) {
+          throw new Error('expected cache entry');
+        }
+
+        expect(cache.getEntry(String(first.id))?.analysis.metadata.analysisId).toBe('test-id');
+        expect(cache.getEntry(cacheKeyString)?.analysis.metadata.analysisId).toBe('test-id');
+        expect(cache.getEntry(cacheKey.fileHash)?.analysis.metadata.analysisId).toBe('test-id');
+
+        fs.unlinkSync(testFile);
+        expect(cache.getEntry(testFile)?.analysis.metadata.analysisId).toBe('test-id');
+      } finally {
+        if (fs.existsSync(testFile)) {
+          fs.unlinkSync(testFile);
+        }
+      }
+    });
   });
 });

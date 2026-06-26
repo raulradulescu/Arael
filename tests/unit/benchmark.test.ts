@@ -105,13 +105,14 @@ describe('benchmark manifest and reporters', () => {
     expect(manifest.samples[0]?.path).toBe(samplePath);
   });
 
-  it('formats JSONL, CSV, Markdown, and LaTeX reports', () => {
+  it('formats JSONL, CSV, Markdown, LaTeX, and HTML reports', () => {
     const result = makeBenchmarkRunResult();
 
     expect(formatBenchmarkResult(result, 'jsonl')).toContain('"type":"sample"');
     expect(formatBenchmarkResult(result, 'csv')).toContain('run_id');
     expect(formatBenchmarkResult(result, 'markdown')).toContain('# Arael Benchmark Report');
     expect(formatBenchmarkResult(result, 'latex')).toContain('\\begin{table}');
+    expect(formatBenchmarkResult(result, 'html')).toContain('<!DOCTYPE html>');
   });
 });
 
