@@ -1,48 +1,32 @@
 /**
- * Tests for MITRE ATT&CK Mapping (v2.6)
+ * Tests for MITRE ATT&CK Mapping (src/analysis/mitre-mapper.ts).
  *
- * Maps detected behaviors to ATT&CK techniques for threat intelligence.
+ * Exercises the real mapper: behaviors carrying a `mitreId` are resolved
+ * against the technique database, tactics are aggregated, duplicate techniques
+ * merge evidence and ramp confidence, and the lookup helpers behave.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  mapToATTACK,
+  getTechniqueById,
+  getTechniquesByTactic,
+  getTactics,
+  hasTechnique,
+  getTechniqueCountByTactic,
+  getAllTactics,
+  getMITREDatabaseStats
+} from '../../src/analysis/mitre-mapper';
+import type { DetectedBehavior } from '../../src/analysis/behavior-detector';
 
-// Types
-interface ATTACKTechnique {
-  id: string;
-  name: string;
-  tactic: string;
-  confidence: number;
-  evidence: string[];
-}
-
-interface ATTACKMapping {
-  tactics: string[];
-  techniques: ATTACKTechnique[];
-  summary: string;
-}
-
-interface DetectedBehavior {
-  id: string;
-  category: string;
-  description: string;
-  evidence: string[];
-  riskLevel: string;
-}
-
-// Placeholder implementations
-function mapToATTACK(_behaviors: DetectedBehavior[]): ATTACKMapping {
-  // TODO: Implement in src/analysis/mitre-mapper.ts
-  return { tactics: [], techniques: [], summary: '' };
-}
-
-function getTechniqueById(_id: string): ATTACKTechnique | null {
-  // TODO: Implement in src/analysis/mitre-mapper.ts
-  return null;
-}
-
-function getTechniquesByTactic(_tactic: string): ATTACKTechnique[] {
-  // TODO: Implement in src/analysis/mitre-mapper.ts
-  return [];
+function behavior(partial: Partial<DetectedBehavior> & Pick<DetectedBehavior, 'id'>): DetectedBehavior {
+  return {
+    category: 'execution',
+    description: partial.description ?? `${partial.id} behavior`,
+    evidence: [],
+    riskLevel: 'medium',
+    confidence: 0.8,
+    ...partial
+  };
 }
 
 describe('MITRE ATT&CK Mapping', () => {
@@ -50,53 +34,51 @@ describe('MITRE ATT&CK Mapping', () => {
 
   beforeEach(() => {
     mockBehaviors = [
-      {
+      behavior({
         id: 'process_injection',
         category: 'execution',
-        description: 'Injects code into other processes',
         evidence: ['VirtualAllocEx', 'WriteProcessMemory', 'CreateRemoteThread'],
-        riskLevel: 'critical'
-      },
-      {
+        riskLevel: 'critical',
+        confidence: 0.9,
+        mitreId: 'T1055'
+      }),
+      behavior({
         id: 'persistence_registry',
         category: 'persistence',
-        description: 'Modifies registry for persistence',
-        evidence: ['RegSetValueExA', 'HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'],
-        riskLevel: 'high'
-      },
-      {
+        evidence: ['RegSetValueExA', 'CurrentVersion\\Run'],
+        riskLevel: 'high',
+        confidence: 0.85,
+        mitreId: 'T1547.001'
+      }),
+      behavior({
         id: 'network_client',
         category: 'network',
-        description: 'Establishes outbound network connections',
-        evidence: ['WSAStartup', 'connect', 'send', 'recv'],
-        riskLevel: 'medium'
-      },
-      {
-        id: 'anti_analysis',
-        category: 'defense_evasion',
-        description: 'Contains anti-analysis techniques',
-        evidence: ['IsDebuggerPresent', 'CheckRemoteDebuggerPresent'],
-        riskLevel: 'medium'
-      },
-      {
+        evidence: ['WSAStartup', 'connect', 'send'],
+        riskLevel: 'medium',
+        confidence: 0.7,
+        mitreId: 'T1071'
+      }),
+      behavior({
         id: 'credential_theft',
         category: 'credential_access',
-        description: 'Accesses credential storage',
         evidence: ['CredEnumerateA', 'CryptUnprotectData'],
-        riskLevel: 'critical'
-      },
-      {
+        riskLevel: 'critical',
+        confidence: 0.88,
+        mitreId: 'T1555'
+      }),
+      behavior({
         id: 'file_encryption',
         category: 'impact',
-        description: 'Encrypts files on disk',
-        evidence: ['FindFirstFileA', 'FindNextFileA', 'CryptEncrypt', '.encrypted'],
-        riskLevel: 'critical'
-      }
+        evidence: ['CryptEncrypt', '.encrypted'],
+        riskLevel: 'critical',
+        confidence: 0.92,
+        mitreId: 'T1486'
+      })
     ];
   });
 
   describe('mapToATTACK', () => {
-    it('should return ATT&CK mapping structure', () => {
+    it('returns the ATT&CK mapping structure', () => {
       const mapping = mapToATTACK(mockBehaviors);
 
       expect(mapping).toHaveProperty('tactics');
@@ -104,384 +86,158 @@ describe('MITRE ATT&CK Mapping', () => {
       expect(mapping).toHaveProperty('summary');
       expect(Array.isArray(mapping.tactics)).toBe(true);
       expect(Array.isArray(mapping.techniques)).toBe(true);
-    });
-
-    it('should map process injection to T1055', () => {
-      const injectionBehavior = mockBehaviors.filter(b => b.id === 'process_injection');
-      const mapping = mapToATTACK(injectionBehavior);
-
-      // T1055 - Process Injection
-      const hasT1055 = mapping.techniques.some(t => t.id === 'T1055');
-
-      // Placeholder until implemented
-      expect(true).toBe(true);
-    });
-
-    it('should map registry persistence to T1547.001', () => {
-      const registryBehavior = mockBehaviors.filter(b => b.id === 'persistence_registry');
-      const mapping = mapToATTACK(registryBehavior);
-
-      // T1547.001 - Registry Run Keys / Startup Folder
-      const hasT1547 = mapping.techniques.some(t =>
-        t.id === 'T1547.001' || t.id === 'T1547'
-      );
-
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should map network activity to T1071', () => {
-      const networkBehavior = mockBehaviors.filter(b => b.id === 'network_client');
-      const mapping = mapToATTACK(networkBehavior);
-
-      // T1071 - Application Layer Protocol
-      const hasT1071 = mapping.techniques.some(t => t.id.startsWith('T1071'));
-
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should map anti-analysis to T1497', () => {
-      const antiAnalysisBehavior = mockBehaviors.filter(b => b.id === 'anti_analysis');
-      const mapping = mapToATTACK(antiAnalysisBehavior);
-
-      // T1497 - Virtualization/Sandbox Evasion
-      // T1622 - Debugger Evasion
-      const hasEvasion = mapping.techniques.some(t =>
-        t.id === 'T1497' || t.id === 'T1622'
-      );
-
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should map credential theft to T1555', () => {
-      const credBehavior = mockBehaviors.filter(b => b.id === 'credential_theft');
-      const mapping = mapToATTACK(credBehavior);
-
-      // T1555 - Credentials from Password Stores
-      const hasT1555 = mapping.techniques.some(t => t.id.startsWith('T1555'));
-
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should map file encryption to T1486', () => {
-      const encryptBehavior = mockBehaviors.filter(b => b.id === 'file_encryption');
-      const mapping = mapToATTACK(encryptBehavior);
-
-      // T1486 - Data Encrypted for Impact (Ransomware)
-      const hasT1486 = mapping.techniques.some(t => t.id === 'T1486');
-
-      expect(true).toBe(true); // Placeholder
-    });
-  });
-
-  describe('Tactic Coverage', () => {
-    it('should identify Execution tactic from process injection', () => {
-      const mapping = mapToATTACK(mockBehaviors);
-
-      // Execution tactic should be present
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should identify Persistence tactic from registry modification', () => {
-      const mapping = mapToATTACK(mockBehaviors);
-
-      // Persistence tactic should be present
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should identify Defense Evasion tactic from anti-analysis', () => {
-      const mapping = mapToATTACK(mockBehaviors);
-
-      // Defense Evasion tactic should be present
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should identify Credential Access tactic from credential theft', () => {
-      const mapping = mapToATTACK(mockBehaviors);
-
-      // Credential Access tactic should be present
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should identify Impact tactic from file encryption', () => {
-      const mapping = mapToATTACK(mockBehaviors);
-
-      // Impact tactic should be present
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should identify Command and Control tactic from network activity', () => {
-      const mapping = mapToATTACK(mockBehaviors);
-
-      // Command and Control tactic should be present
-      expect(true).toBe(true); // Placeholder
-    });
-  });
-
-  describe('Confidence Scoring', () => {
-    it('should assign high confidence when multiple indicators match', () => {
-      // Process injection with all 3 key APIs = high confidence
-      const injectionBehavior: DetectedBehavior[] = [{
-        id: 'process_injection',
-        category: 'execution',
-        description: 'Process injection detected',
-        evidence: ['VirtualAllocEx', 'WriteProcessMemory', 'CreateRemoteThread'],
-        riskLevel: 'critical'
-      }];
-
-      const mapping = mapToATTACK(injectionBehavior);
-
-      // Should have confidence > 0.8
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should assign lower confidence with partial indicators', () => {
-      // Only VirtualAllocEx without WriteProcessMemory/CreateRemoteThread
-      const partialBehavior: DetectedBehavior[] = [{
-        id: 'memory_allocation',
-        category: 'execution',
-        description: 'Remote memory allocation',
-        evidence: ['VirtualAllocEx'],
-        riskLevel: 'medium'
-      }];
-
-      const mapping = mapToATTACK(partialBehavior);
-
-      // Should have confidence < 0.6
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should increase confidence with corroborating evidence', () => {
-      // Registry persistence + scheduled task = higher persistence confidence
-      const multiPersistence: DetectedBehavior[] = [
-        {
-          id: 'persistence_registry',
-          category: 'persistence',
-          description: 'Registry persistence',
-          evidence: ['RegSetValueExA', 'CurrentVersion\\Run'],
-          riskLevel: 'high'
-        },
-        {
-          id: 'persistence_scheduled_task',
-          category: 'persistence',
-          description: 'Scheduled task creation',
-          evidence: ['ITaskScheduler', 'schtasks'],
-          riskLevel: 'high'
-        }
-      ];
-
-      const mapping = mapToATTACK(multiPersistence);
-
-      // Multiple persistence mechanisms = higher confidence
-      expect(true).toBe(true); // Placeholder
-    });
-  });
-
-  describe('Evidence Linking', () => {
-    it('should link imports to techniques', () => {
-      const mapping = mapToATTACK(mockBehaviors);
-
-      // Each technique should have evidence array
-      mapping.techniques.forEach(tech => {
-        expect(Array.isArray(tech.evidence)).toBe(true);
-      });
-
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should link strings to techniques', () => {
-      const stringBehavior: DetectedBehavior[] = [{
-        id: 'persistence_registry',
-        category: 'persistence',
-        description: 'Registry persistence via Run key',
-        evidence: ['HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run'],
-        riskLevel: 'high'
-      }];
-
-      const mapping = mapToATTACK(stringBehavior);
-
-      // Registry path should be in evidence
-      expect(true).toBe(true); // Placeholder
-    });
-  });
-
-  describe('Technique Database', () => {
-    it('should have T1055 Process Injection', () => {
-      const tech = getTechniqueById('T1055');
-
-      // Should return technique info
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should have T1547.001 Registry Run Keys', () => {
-      const tech = getTechniqueById('T1547.001');
-
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should have T1071 Application Layer Protocol', () => {
-      const tech = getTechniqueById('T1071');
-
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should have T1486 Data Encrypted for Impact', () => {
-      const tech = getTechniqueById('T1486');
-
-      expect(true).toBe(true); // Placeholder
-    });
-
-    it('should return techniques by tactic', () => {
-      const executionTechs = getTechniquesByTactic('execution');
-      const persistenceTechs = getTechniquesByTactic('persistence');
-
-      expect(Array.isArray(executionTechs)).toBe(true);
-      expect(Array.isArray(persistenceTechs)).toBe(true);
-    });
-  });
-
-  describe('Summary Generation', () => {
-    it('should generate human-readable summary', () => {
-      const mapping = mapToATTACK(mockBehaviors);
-
-      // Summary should describe the threat
       expect(typeof mapping.summary).toBe('string');
     });
 
-    it('should mention primary tactics in summary', () => {
+    it('maps process injection to T1055 (Defense Evasion)', () => {
+      const mapping = mapToATTACK([mockBehaviors[0]!]);
+
+      const t1055 = mapping.techniques.find(t => t.id === 'T1055');
+      expect(t1055).toBeDefined();
+      expect(t1055?.name).toBe('Process Injection');
+      expect(t1055?.tactic).toBe('Defense Evasion');
+      expect(mapping.tactics).toContain('Defense Evasion');
+    });
+
+    it('maps registry persistence to T1547.001 (Persistence)', () => {
+      const mapping = mapToATTACK([mockBehaviors[1]!]);
+
+      expect(hasTechnique(mapping, 'T1547.001')).toBe(true);
+      expect(mapping.tactics).toContain('Persistence');
+    });
+
+    it('maps network activity to a T1071 technique (Command and Control)', () => {
+      const mapping = mapToATTACK([mockBehaviors[2]!]);
+
+      expect(mapping.techniques.some(t => t.id.startsWith('T1071'))).toBe(true);
+      expect(mapping.tactics).toContain('Command and Control');
+    });
+
+    it('maps credential theft to T1555 and file encryption to T1486', () => {
+      const mapping = mapToATTACK([mockBehaviors[3]!, mockBehaviors[4]!]);
+
+      expect(hasTechnique(mapping, 'T1555')).toBe(true);
+      expect(hasTechnique(mapping, 'T1486')).toBe(true);
+      expect(mapping.tactics).toEqual(expect.arrayContaining(['Credential Access', 'Impact']));
+    });
+
+    it('carries behavior evidence onto the mapped technique', () => {
+      const mapping = mapToATTACK([mockBehaviors[0]!]);
+      const t1055 = mapping.techniques.find(t => t.id === 'T1055');
+
+      expect(t1055?.evidence).toEqual(
+        expect.arrayContaining(['VirtualAllocEx', 'WriteProcessMemory', 'CreateRemoteThread'])
+      );
+    });
+
+    it('preserves the behavior confidence on the technique', () => {
+      const mapping = mapToATTACK([mockBehaviors[0]!]);
+      const t1055 = mapping.techniques.find(t => t.id === 'T1055');
+
+      expect(t1055?.confidence).toBeCloseTo(0.9);
+    });
+
+    it('merges duplicate techniques, deduping evidence and ramping confidence', () => {
+      const mapping = mapToATTACK([
+        behavior({ id: 'inj-a', evidence: ['VirtualAllocEx'], confidence: 0.8, mitreId: 'T1055' }),
+        behavior({ id: 'inj-b', evidence: ['VirtualAllocEx', 'CreateRemoteThread'], confidence: 0.8, mitreId: 'T1055' })
+      ]);
+
+      const matches = mapping.techniques.filter(t => t.id === 'T1055');
+      expect(matches).toHaveLength(1);
+      const merged = matches[0]!;
+      // Evidence deduplicated across both behaviors.
+      expect(merged.evidence.sort()).toEqual(['CreateRemoteThread', 'VirtualAllocEx']);
+      // Second occurrence bumps confidence by 0.1 (capped at 0.95).
+      expect(merged.confidence).toBeCloseTo(0.9);
+    });
+
+    it('sorts techniques by descending confidence', () => {
       const mapping = mapToATTACK(mockBehaviors);
-
-      // Summary should reference detected tactics
-      // e.g., "Sample exhibits Execution, Persistence, and Defense Evasion capabilities"
-      expect(true).toBe(true); // Placeholder
+      const confidences = mapping.techniques.map(t => t.confidence);
+      const sorted = [...confidences].sort((a, b) => b - a);
+      expect(confidences).toEqual(sorted);
     });
 
-    it('should highlight critical techniques in summary', () => {
+    it('ignores behaviors without a known mitreId', () => {
+      const mapping = mapToATTACK([
+        behavior({ id: 'no-mitre', evidence: ['foo'] }),
+        behavior({ id: 'unknown-mitre', evidence: ['bar'], mitreId: 'T9999' })
+      ]);
+
+      expect(mapping.techniques).toHaveLength(0);
+      expect(mapping.tactics).toHaveLength(0);
+    });
+
+    it('returns an explicit summary when nothing maps', () => {
+      const mapping = mapToATTACK([]);
+      expect(mapping.techniques).toHaveLength(0);
+      expect(mapping.summary).toBe('No MITRE ATT&CK techniques identified.');
+    });
+
+    it('summarises high-confidence mappings', () => {
       const mapping = mapToATTACK(mockBehaviors);
-
-      // Critical techniques like T1055 and T1486 should be mentioned
-      expect(true).toBe(true); // Placeholder
-    });
-  });
-});
-
-describe('ATT&CK Technique Definitions', () => {
-  describe('Execution Techniques', () => {
-    const executionTechniques = [
-      { id: 'T1055', name: 'Process Injection', indicators: ['VirtualAllocEx', 'WriteProcessMemory', 'CreateRemoteThread'] },
-      { id: 'T1059', name: 'Command and Scripting Interpreter', indicators: ['cmd.exe', 'powershell', 'wscript'] },
-      { id: 'T1106', name: 'Native API', indicators: ['NtCreateThread', 'NtAllocateVirtualMemory'] },
-    ];
-
-    executionTechniques.forEach(tech => {
-      it(`should define ${tech.id} - ${tech.name}`, () => {
-        // Technique should be in database with correct indicators
-        expect(true).toBe(true); // Placeholder
-      });
+      // mockBehaviors has 5 techniques, four with confidence >= 0.8.
+      expect(mapping.summary).toMatch(/ATT&CK technique/);
+      expect(mapping.summary.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Persistence Techniques', () => {
-    const persistenceTechniques = [
-      { id: 'T1547.001', name: 'Registry Run Keys', indicators: ['CurrentVersion\\Run', 'RegSetValueEx'] },
-      { id: 'T1053', name: 'Scheduled Task/Job', indicators: ['schtasks', 'ITaskScheduler'] },
-      { id: 'T1543.003', name: 'Windows Service', indicators: ['CreateServiceA', 'StartServiceA'] },
-    ];
+  describe('tactic aggregation', () => {
+    it('collects every distinct tactic represented in the behaviors', () => {
+      const mapping = mapToATTACK(mockBehaviors);
+      expect(getTactics(mapping)).toEqual(
+        expect.arrayContaining([
+          'Defense Evasion',
+          'Persistence',
+          'Command and Control',
+          'Credential Access',
+          'Impact'
+        ])
+      );
+    });
 
-    persistenceTechniques.forEach(tech => {
-      it(`should define ${tech.id} - ${tech.name}`, () => {
-        expect(true).toBe(true); // Placeholder
-      });
+    it('counts techniques per tactic', () => {
+      const mapping = mapToATTACK(mockBehaviors);
+      const counts = getTechniqueCountByTactic(mapping);
+      const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+      expect(total).toBe(mapping.techniques.length);
+      expect(counts['Defense Evasion']).toBeGreaterThanOrEqual(1);
     });
   });
 
-  describe('Defense Evasion Techniques', () => {
-    const evasionTechniques = [
-      { id: 'T1027', name: 'Obfuscated Files', indicators: ['high_entropy', 'packed'] },
-      { id: 'T1497', name: 'Virtualization/Sandbox Evasion', indicators: ['vmware', 'virtualbox', 'sandbox'] },
-      { id: 'T1622', name: 'Debugger Evasion', indicators: ['IsDebuggerPresent', 'NtQueryInformationProcess'] },
-    ];
-
-    evasionTechniques.forEach(tech => {
-      it(`should define ${tech.id} - ${tech.name}`, () => {
-        expect(true).toBe(true); // Placeholder
-      });
+  describe('technique database lookups', () => {
+    it('resolves a technique by id', () => {
+      const tech = getTechniqueById('T1055');
+      expect(tech).not.toBeNull();
+      expect(tech?.name).toBe('Process Injection');
+      expect(tech?.tactic).toBe('Defense Evasion');
+      expect(tech?.url).toContain('attack.mitre.org');
     });
-  });
 
-  describe('Credential Access Techniques', () => {
-    const credTechniques = [
-      { id: 'T1555', name: 'Credentials from Password Stores', indicators: ['CredEnumerate', 'CryptUnprotectData'] },
-      { id: 'T1003', name: 'OS Credential Dumping', indicators: ['lsass', 'MiniDumpWriteDump'] },
-    ];
-
-    credTechniques.forEach(tech => {
-      it(`should define ${tech.id} - ${tech.name}`, () => {
-        expect(true).toBe(true); // Placeholder
-      });
+    it('returns null for an unknown technique id', () => {
+      expect(getTechniqueById('T0000')).toBeNull();
     });
-  });
 
-  describe('Impact Techniques', () => {
-    const impactTechniques = [
-      { id: 'T1486', name: 'Data Encrypted for Impact', indicators: ['CryptEncrypt', '.encrypted', 'ransom'] },
-      { id: 'T1489', name: 'Service Stop', indicators: ['ControlService', 'SERVICE_CONTROL_STOP'] },
-    ];
-
-    impactTechniques.forEach(tech => {
-      it(`should define ${tech.id} - ${tech.name}`, () => {
-        expect(true).toBe(true); // Placeholder
-      });
+    it('lists techniques for a tactic case-insensitively', () => {
+      const persistence = getTechniquesByTactic('persistence');
+      expect(persistence.length).toBeGreaterThan(0);
+      expect(persistence.every(t => t.tactic === 'Persistence')).toBe(true);
+      expect(persistence.map(t => t.id)).toContain('T1547.001');
     });
-  });
-});
 
-describe('Edge Cases', () => {
-  it('should handle empty behavior list', () => {
-    const mapping = mapToATTACK([]);
+    it('exposes the full tactic catalogue', () => {
+      const tactics = getAllTactics();
+      expect(tactics).toEqual(expect.arrayContaining(['Execution', 'Persistence', 'Impact']));
+      // No duplicates.
+      expect(new Set(tactics).size).toBe(tactics.length);
+    });
 
-    expect(mapping.tactics).toEqual([]);
-    expect(mapping.techniques).toEqual([]);
-  });
-
-  it('should handle unknown behaviors gracefully', () => {
-    const unknownBehavior: DetectedBehavior[] = [{
-      id: 'unknown_behavior',
-      category: 'unknown',
-      description: 'Some unknown behavior',
-      evidence: ['UnknownAPI'],
-      riskLevel: 'low'
-    }];
-
-    const mapping = mapToATTACK(unknownBehavior);
-
-    // Should not crash, may return empty or partial mapping
-    expect(mapping).toHaveProperty('tactics');
-    expect(mapping).toHaveProperty('techniques');
-  });
-
-  it('should deduplicate techniques from multiple behaviors', () => {
-    // Two behaviors that both map to T1055
-    const duplicateBehaviors: DetectedBehavior[] = [
-      {
-        id: 'dll_injection',
-        category: 'execution',
-        description: 'DLL injection',
-        evidence: ['LoadLibraryA', 'CreateRemoteThread'],
-        riskLevel: 'critical'
-      },
-      {
-        id: 'process_hollowing',
-        category: 'execution',
-        description: 'Process hollowing',
-        evidence: ['NtUnmapViewOfSection', 'WriteProcessMemory'],
-        riskLevel: 'critical'
-      }
-    ];
-
-    const mapping = mapToATTACK(duplicateBehaviors);
-
-    // T1055 should appear only once, but with combined evidence
-    const t1055Count = mapping.techniques.filter(t => t.id === 'T1055').length;
-    expect(t1055Count <= 1).toBe(true);
+    it('reports database statistics consistent with the catalogue', () => {
+      const stats = getMITREDatabaseStats();
+      expect(stats.totalTechniques).toBeGreaterThan(20);
+      const summed = Object.values(stats.byTactic).reduce((sum, n) => sum + n, 0);
+      expect(summed).toBe(stats.totalTechniques);
+    });
   });
 });

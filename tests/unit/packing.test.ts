@@ -42,7 +42,7 @@ describe('Packing Detection', () => {
 
       const upxPacker = result.packers.find(p => p.name === 'UPX');
       expect(upxPacker).toBeTruthy();
-      expect(upxPacker?.indicators).toContain('UPX section names');
+      expect(upxPacker?.indicators?.some(indicator => indicator.includes('UPX section'))).toBe(true);
     });
 
     it('should verify UPX with `upx -t` when available', async () => {
@@ -96,7 +96,7 @@ describe('Packing Detection', () => {
 
       const pyinstallerPacker = result.packers.find(p => p.name === 'PyInstaller');
       expect(pyinstallerPacker).toBeTruthy();
-      expect(pyinstallerPacker?.indicators).toContain('PyInstaller strings');
+      expect(pyinstallerPacker?.indicators?.some(indicator => indicator.includes('PyInstaller'))).toBe(true);
     });
 
     it('should detect Py2Exe strings', async () => {

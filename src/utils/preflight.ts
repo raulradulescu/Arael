@@ -9,6 +9,25 @@ const MACHO_CIGAM_32 = Buffer.from([0xfe, 0xed, 0xfa, 0xce]); // MH_CIGAM (big-e
 const MACHO_CIGAM_64 = Buffer.from([0xfe, 0xed, 0xfa, 0xcf]); // MH_CIGAM_64 (big-endian)
 const MACHO_FAT = Buffer.from([0xca, 0xfe, 0xba, 0xbe]); // FAT_MAGIC (universal binary)
 
+/**
+ * Cheap synchronous check for the ELF magic number.
+ * Returns false for missing/unreadable files or any non-ELF content.
+ */
+export function isElfBinary(filepath: string): boolean {
+  try {
+    const fd = fs.openSync(filepath, 'r');
+    try {
+      const header = Buffer.alloc(4);
+      const bytesRead = fs.readSync(fd, header, 0, 4, 0);
+      return bytesRead === 4 && header.equals(ELF_MAGIC);
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    return false;
+  }
+}
+
 export interface PreflightResult {
   valid: boolean;
   filepath: string;

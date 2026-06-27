@@ -57,3 +57,22 @@ export function bytesToHex(buffer: Buffer, separator = ' '): string {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join(separator);
 }
+
+/**
+ * Parse a hex string (with or without separators) into a buffer.
+ * Inverse of {@link bytesToHex}. Throws on odd-length input.
+ */
+export function hexToBytes(hex: string): Buffer {
+  const compact = hex.replace(/[\s:]/g, '');
+  if (compact.length % 2 !== 0) {
+    throw new Error(`Invalid hex string: odd length (${compact.length})`);
+  }
+  if (compact.length > 0 && !/^[0-9a-fA-F]+$/.test(compact)) {
+    throw new Error('Invalid hex string: contains non-hex characters');
+  }
+  const bytes = new Uint8Array(compact.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(compact.substr(i * 2, 2), 16);
+  }
+  return Buffer.from(bytes);
+}
