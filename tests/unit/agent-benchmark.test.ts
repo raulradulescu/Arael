@@ -9,28 +9,35 @@ describe('agent benchmark', () => {
   it('parses default agent specs by shape, not pinned model versions', () => {
     const defaults = parseAgentSpecs();
 
-    // Three cloud engines, each as an +arael / bare pair (6 instances).
-    expect(defaults).toHaveLength(6);
+    // Claude and Codex each run as an +arael / bare pair; Antigravity (agy) runs
+    // bare-only (its MCP config is global, not per-invocation) — 5 instances total.
+    expect(defaults).toHaveLength(5);
     expect(defaults.map(spec => spec.engine)).toEqual([
-      'claude', 'claude', 'codex', 'codex', 'gemini', 'gemini'
+      'claude', 'claude', 'codex', 'codex', 'antigravity'
     ]);
     expect(defaults.map(spec => spec.araelMcp)).toEqual([
-      true, false, true, false, true, false
+      true, false, true, false, false
     ]);
     // Every default carries a non-empty model string. We intentionally do NOT
     // assert the exact version so bumping model defaults doesn't break tests.
     expect(defaults.every(spec => typeof spec.model === 'string' && spec.model.length > 0)).toBe(true);
-    // Each engine's +arael and bare variants target the same model.
-    for (let i = 0; i < defaults.length; i += 2) {
-      expect(defaults[i]?.model).toBe(defaults[i + 1]?.model);
-    }
+    // The two cloud pairs target the same model across their +arael/bare variants.
+    expect(defaults[0]?.model).toBe(defaults[1]?.model);
+    expect(defaults[2]?.model).toBe(defaults[3]?.model);
   });
 
   it('parses explicit agent specs', () => {
-    expect(parseAgentSpecs('codex:some-model,claude:some-model+arael,gemini:some-model')).toEqual([
+    expect(parseAgentSpecs('codex:some-model,claude:some-model+arael,antigravity:some-model')).toEqual([
       { engine: 'codex', model: 'some-model', araelMcp: false },
       { engine: 'claude', model: 'some-model', araelMcp: true },
-      { engine: 'gemini', model: 'some-model', araelMcp: false }
+      { engine: 'antigravity', model: 'some-model', araelMcp: false }
+    ]);
+
+    // `agy:` is an alias for the antigravity engine, and antigravity is always bare
+    // (a trailing +arael is ignored since its MCP config is global, not per-run).
+    expect(parseAgentSpecs('agy:Gemini 3.5 Flash (Pro),agy:some-model+arael')).toEqual([
+      { engine: 'antigravity', model: 'Gemini 3.5 Flash (Pro)', araelMcp: false },
+      { engine: 'antigravity', model: 'some-model', araelMcp: false }
     ]);
 
     // Local model tags carry a colon (e.g. qwen3.5:4b) and never attach MCP.
@@ -55,7 +62,7 @@ describe('agent benchmark', () => {
       force: false,
       codexBin: 'codex',
       claudeBin: 'claude',
-      geminiBin: 'gemini',
+      antigravityBin: 'agy',
       ollamaUrl: 'http://localhost:11434',
       dryRun: true
     });
@@ -86,7 +93,7 @@ describe('agent benchmark', () => {
       force: false,
       codexBin: 'codex',
       claudeBin: 'claude',
-      geminiBin: 'gemini',
+      antigravityBin: 'agy',
       ollamaUrl: 'http://localhost:11434',
       dryRun: true
     });
@@ -105,6 +112,32 @@ describe('agent benchmark', () => {
     expect(typeof result.metadata?.araelVersion).toBe('string');
   });
 
+  it('passes the Antigravity prompt as the value of --print', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arael-agent-bench-'));
+    fs.writeFileSync(path.join(tempDir, 'challenge.bin'), 'hello');
+
+    const result = await runAgentBenchmark({
+      target: tempDir,
+      format: 'markdown',
+      agents: parseAgentSpecs('agy:Gemini 3.5 Flash (High)'),
+      timeoutSeconds: 30,
+      extractArchives: false,
+      runs: 1,
+      concurrency: 1,
+      force: false,
+      codexBin: 'codex',
+      claudeBin: 'claude',
+      antigravityBin: 'agy',
+      ollamaUrl: 'http://localhost:11434',
+      dryRun: true
+    });
+
+    const command = result.records[0]!.command;
+    const printIndex = command.indexOf('--print');
+    expect(printIndex).toBe(command.length - 2);
+    expect(command[printIndex + 1]).toContain('You are benchmarking reverse-engineering performance');
+  });
+
   it('expands cells by run count and reports variant summaries', async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'arael-agent-bench-'));
     fs.writeFileSync(path.join(tempDir, 'challenge.bin'), 'hello');
@@ -120,7 +153,7 @@ describe('agent benchmark', () => {
       force: false,
       codexBin: 'codex',
       claudeBin: 'claude',
-      geminiBin: 'gemini',
+      antigravityBin: 'agy',
       ollamaUrl: 'http://localhost:11434',
       dryRun: true
     });
@@ -153,7 +186,7 @@ describe('agent benchmark', () => {
       groundTruthPath,
       codexBin: 'codex',
       claudeBin: 'claude',
-      geminiBin: 'gemini',
+      antigravityBin: 'agy',
       ollamaUrl: 'http://localhost:11434',
       dryRun: true
     });
@@ -178,7 +211,7 @@ describe('agent benchmark', () => {
       force: false,
       codexBin: 'codex',
       claudeBin: 'claude',
-      geminiBin: 'gemini',
+      antigravityBin: 'agy',
       ollamaUrl: 'http://localhost:11434',
       dryRun: true
     });

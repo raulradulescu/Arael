@@ -1,329 +1,243 @@
 # Arael
 
-**Reverse Engineering Assistant for Cybersecurity Professionals**
+**A reverse-engineering assistant built on Ghidra and PyGhidra**
 
-[![Version](https://img.shields.io/badge/version-3.0.1-blue)]()
+[![Version](https://img.shields.io/badge/version-3.0.3-blue)]()
 [![Tests](https://img.shields.io/badge/tests-271%20passing-brightgreen)]()
-[![Ghidra](https://img.shields.io/badge/Ghidra-12.0-blue)]()
+[![Ghidra](https://img.shields.io/badge/Ghidra-12.0%2B-blue)]()
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)]()
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)]()
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-blue)]()
 
-Arael runs Ghidra analysis and exposes the results as structured JSON. Use it as a CLI, an MCP server for LLMs, or an interactive shell for quick triage.
+Arael runs static binary analysis through Ghidra and returns structured results. Use it from the command line, an interactive shell, or as an MCP server for an AI client such as Claude Code.
 
-> **Bachelor's Thesis Project for 2026 by Raul Radulescu**
+> Bachelor's thesis project by Raul Radulescu, 2026.
 
----
+## What Arael does
 
-## Why Arael
-- One command to analyze a binary with Ghidra
-- Clean JSON output for automation, scripts, and LLM prompts
-- CLI, MCP server, and interactive shell in one tool
+- Analyzes executables: metadata, functions, pseudocode, strings, imports, exports, call relationships, packing, and hashes.
+- Decompiles/disassembles individual functions, finds cross-references, and builds call graphs.
+- Extracts IOCs and suspicious behaviors, and maps them to a curated subset of MITRE ATT&CK.
+- Scans with built-in, ReversingLabs, or custom YARA rules.
+- Produces standalone HTML reports and caches results in SQLite.
+- Answers questions about an analysis through cloud or local LLMs (`ask`).
+- Benchmarks Arael and external AI agents against binary corpora (`benchmark`, `benchmark-agents`).
 
----
+Arael performs **static** analysis and does not intentionally execute the target. Still handle untrusted files in an isolated VM — parsers process attacker-controlled input.
 
-## New in v2.6
+## Requirements
 
-### LLM Integration
-- **`arael context`**: LLM-optimized analysis with classification, behaviors, and IOCs
-- **`arael ask`**: Natural language queries using OpenAI, Anthropic, Google (Gemini), or Ollama
-- **Behavior Detection**: 25+ rules detecting network, injection, credential theft, ransomware patterns
-- **MITRE ATT&CK Mapping**: 36 techniques mapped with confidence scores
-- **IOC Extraction**: IPs, domains, URLs, registry keys, file paths, mutexes
-- **Binary Classification**: Benign/suspicious/malware with type detection (trojan, stealer, rat, etc.)
-- **Import Database**: 483 functions with capability categories and risk levels
+| Component | Version | Purpose |
+|---|---:|---|
+| Node.js | 20+ | CLI and MCP server |
+| Python | 3.10+ | PyGhidra scripts |
+| PyGhidra | 3.0+ | Python access to Ghidra |
+| Ghidra | 12.0+ | Decompilation and analysis |
+| JDK | 21 (64-bit) | Required by current Ghidra |
+| Git | current | Clone the repository |
+
+**Optional:** `yara` (native scanning; falls back to pattern matching), `ghidra-bridge` (live-bridge mode; not needed for headless), an OpenAI/Anthropic/Google key or Ollama server (for `ask`), and Claude Code/Codex/Antigravity/Ollama (for `benchmark-agents`).
+
+Sources: [Ghidra releases](https://github.com/NationalSecurityAgency/ghidra/releases) · [PyGhidra](https://pypi.org/project/pyghidra/) · [Node.js](https://nodejs.org/en/download) · [Python](https://www.python.org/downloads/)
+
+## Installation
+
+Ghidra and Arael are **separate** applications — do not install Arael into the Ghidra directory or as a Ghidra extension. The key requirements are: `GHIDRA_PATH` points to the extracted Ghidra root (the one containing `support/analyzeHeadless[.bat]`), `ARAEL_PYTHON` points to the Python with `pyghidra` installed, and MCP config uses absolute paths (no `~`).
 
 ```bash
-# LLM-ready context
-arael context ./malware.exe
+# 1. JDK 21 (verify)
+java -version
 
-# Ask questions using LLM (OpenAI, Anthropic, Google, or Ollama)
-arael ask ./binary -q "Is this malicious?"
-arael ask ./binary -q malicious -p google
+# 2. Ghidra: download an official release ZIP (not the source archive),
+#    extract to a permanent path, run ghidraRun once to confirm Java is found.
 
-# JSON output for programmatic use
-arael context ./binary --json
-```
-
-**Output includes:**
-- Classification with confidence and reasoning
-- Detected behaviors with evidence
-- MITRE ATT&CK techniques and tactics
-- Extracted IOCs
-- Risk assessment
-- Suggested analysis steps
-
-### Also in v2.5
-- Interactive Shell: `arael shell ./binary`
-- Batch Analysis: `arael batch ./samples/*.exe`
-- YARA Scanning: 43 built-in + 310 ReversingLabs rules
-- HTML Reports: `arael report ./binary`
-- ARM64/ARM32 support
-
----
-
-## Quick Start
-
-### Prerequisites
-- Node.js 20+, Python 3.10+, Java 17+, Ghidra 12.0+
-
-### Install and build
-```bash
+# 3. Clone Arael
 git clone https://github.com/raulradulescu/arael.git
 cd arael
 
-# Python setup
-python3 -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install pyghidra
+# 4. Python env + PyGhidra
+python3 -m venv .venv            # Windows: py -3 -m venv .venv
+source .venv/bin/activate        # Windows: .\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install "pyghidra>=3.0"
+python -c "import pyghidra; print(pyghidra.__file__)"
 
-# Node setup
+# 5. Build (and optionally link as a global command)
 npm install
-
-# Configure .env
-echo 'GHIDRA_PATH="/path/to/ghidra_12.0_PUBLIC"' > .env
-echo 'ARAEL_PYTHON="/path/to/.venv/bin/python"' >> .env
-
-# Optional: Add LLM API keys for 'arael ask' command
-echo 'OPENAI_API_KEY=sk-...' >> .env
-echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env
-echo 'GOOGLE_API_KEY=AIza...' >> .env
-
-# Build
 npm run build
+npm link          # enables `arael`, `arael-mcp`, `arael-check`
 ```
 
-### First run
+Without `npm link`, replace `arael` in examples with `node /absolute/path/to/Arael/dist/cli/index.js`. macOS users may need to build Ghidra's native components (see Ghidra's Getting Started guide).
+
+## Configuration
+
+Set `GHIDRA_PATH` and `ARAEL_PYTHON` either in a repo-local `.env` (loaded from the current working directory) or as OS-level environment variables (needed when running a globally linked `arael` from other directories).
+
+```env
+# Windows
+GHIDRA_PATH=C:\Tools\ghidra_<version>_PUBLIC
+ARAEL_PYTHON=C:\Tools\Arael\.venv\Scripts\python.exe
+GHIDRA_VERSION=<version>
+
+# Linux / macOS
+GHIDRA_PATH=/opt/ghidra_<version>_PUBLIC
+ARAEL_PYTHON=/home/you/tools/Arael/.venv/bin/python
+```
+
+A single `.env` can hold defaults plus `# WSL` and `# Windows` sections; later platform sections override earlier defaults. In WSL, use a Linux-created venv (a Windows venv cannot run as native WSL Python).
+
+### Selected environment variables
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `GHIDRA_PATH` | Extracted Ghidra root | Required (headless) |
+| `ARAEL_PYTHON` | Python containing PyGhidra | `python` / `python3` |
+| `GHIDRA_VERSION` | Version recorded in cache metadata | `unknown` |
+| `GHIDRA_BRIDGE_HOST` / `_PORT` | Optional bridge endpoint | `127.0.0.1` / `4768` |
+| `ARAEL_USE_SYSTEM_STRINGS` | `1` to prefer system `strings` | Unset |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` (or `GEMINI_API_KEY`) | Enable `ask` providers | Unset |
+| `OLLAMA_HOST` / `OLLAMA_MODEL` | Ollama URL / default model | `http://localhost:11434` / provider default |
+
+Keep API keys in `.env` or the OS environment; never commit them.
+
+## Verify and first analysis
+
 ```bash
-# Fast overview for LLMs or humans
-arael context ./binary
-
-# Full JSON analysis
-arael analyze ./binary
+npm run build
+node dist/cli/check.js          # or: arael-check
 ```
 
-### Optional: Configure Claude Code
-Add to `~/.config/claude-code/mcp.json`:
+The checker verifies Node.js, `GHIDRA_PATH`, `analyzeHeadless`, Python, PyGhidra, Java, and the optional bridge. Then try a binary:
+
+```bash
+arael context  /absolute/path/to/binary                 # security + functionality overview
+arael functions /abs/path --exclude-thunks --exclude-external
+arael decompile /abs/path --function main
+arael xrefs    /abs/path --address 0x401000 --direction both
+arael report   /abs/path --output analysis.html --open
+```
+
+Quote paths with spaces. The first analysis is slower (Ghidra startup); later calls reuse the cache.
+
+## CLI commands
+
+Every command supports `arael <command> --help`. Summary:
+
+| Command | Purpose |
+|---|---|
+| `analyze` | Full Ghidra analysis with caching (`--force`, `--output json\|summary`) |
+| `context` | Classification, behaviors, IOCs, ATT&CK, key functions (`--json`) |
+| `ask` | Ask a configured LLM about a binary (`--provider`, `--model`) |
+| `functions` | List/filter functions (`--filter`, `--exclude-thunks/-external`) |
+| `decompile` / `disassemble` | Pseudocode / assembly for one function or address |
+| `strings` | Extract printable strings (`--min-length`, `--with-xrefs`) |
+| `imports` / `exports` | Symbols plus capability/risk metadata |
+| `xrefs` | References to/from an address or function (`--direction`) |
+| `callgraph` | Call graph as `json`, `dot`, or `mermaid` (`--root`, `--depth`) |
+| `hexdump` | Bytes from an address or file offset (`--length`) |
+| `yara` | Scan with builtin/ReversingLabs/custom rules (`--list-rules`, `--json`) |
+| `report` | Standalone HTML report (also `--from-json`, `--from-cache`) |
+| `shell` | Interactive analysis session for one binary |
+| `batch` | Analyze files by glob (`--output`, `--summary`, `--force`) |
+| `cache` | Inspect, export, or clear cached analyses |
+| `benchmark` | Benchmark Arael against a corpus + optional ground truth |
+| `benchmark-agents` | Compare external AI agents with and without Arael MCP |
+
+Providers for `ask` are `openai`, `anthropic`, `google`, `ollama`; built-in question templates include `malicious`, `purpose`, `main`, `network`, `persistence`, `credentials`, `evasion`, `iocs`, `summary`. `report --from-json/--from-cache` and `cache` operations do not start Ghidra.
+
+### `benchmark-agents`
+
+Runs an agent matrix over a directory of challenges and grades results.
+
+| Option | Meaning |
+|---|---|
+| `--agents <spec>` | Comma-separated `engine:model`; append `+arael` to attach MCP |
+| `--runs` / `--concurrency` / `--timeout` | Repeats / parallel processes / per-run seconds (default 1800) |
+| `--ground-truth <file>` | JSON mapping challenge IDs to expected flags |
+| `--pricing <file>` | Token pricing for estimated USD cost |
+| `--prompt <file>` | Prompt used for each run |
+| `--force` | Ignore cached per-cell records |
+| `--extract-archives` / `--archive-password` / `--extract-output` | Archive handling |
+| `--max-challenges <n>` | Limit collected challenge directories |
+| `--format` / `--output` | `json\|jsonl\|csv\|variant-csv\|markdown\|html` / report path |
+| `--arael-server`, `--codex-bin`, `--claude-bin`, `--antigravity-bin`, `--ollama-host` | Overrides |
+| `--dry-run` | Show targets/commands without launching agents |
+
+```bash
+arael benchmark-agents ./challenges \
+  --agents "claude:claude-opus-4-8,claude:claude-opus-4-8+arael,codex:gpt-5.5,codex:gpt-5.5+arael" \
+  --ground-truth ./flags.json --runs 2 --concurrency 2 \
+  --format html --output ./.arael/benchmark-results/agents.html
+```
+
+Artifacts (manifest, stdout, stderr, run records) are written under `<report>.artifacts/`. Ollama runs are local prompt-based baselines.
+
+## MCP setup
+
+The server speaks over stdio; the client starts `node` with the absolute path to `dist/mcp/server.js`. For Claude Code, create `.mcp.json` in the workspace:
+
 ```json
 {
-  "servers": {
+  "mcpServers": {
     "arael": {
       "command": "node",
-      "args": ["/path/to/arael/dist/mcp/server.js"],
+      "args": ["C:\\Tools\\Arael\\dist\\mcp\\server.js"],
       "env": {
-        "GHIDRA_PATH": "/path/to/ghidra",
-        "ARAEL_PYTHON": "/path/to/python"
+        "GHIDRA_PATH": "C:\\Tools\\ghidra_<version>_PUBLIC",
+        "ARAEL_PYTHON": "C:\\Tools\\Arael\\.venv\\Scripts\\python.exe"
       }
     }
   }
 }
 ```
 
----
+Use native paths on Linux/macOS. Embedding `env` here is more reliable than `.env`, because the client may start the server from a different directory. Restart the client after changing config, then confirm tools like `arael_analyze`, `arael_functions`, `arael_decompile` are visible.
 
-## Usage
+Tools (all take an absolute `filepath`): `arael_analyze`, `arael_functions`, `arael_decompile`, `arael_disassemble`, `arael_strings`, `arael_imports`, `arael_exports`, `arael_xrefs`, `arael_callgraph`, `arael_hexdump`. Several expose richer arguments than the CLI (size filters, address ranges, byte/reference inclusion, output widths, encodings); the client lists each tool's schema.
 
-### CLI (common workflows)
-```bash
-# Core analysis
-arael analyze ./binary
-arael functions ./binary --filter "^main"
-arael decompile ./binary --function main
-arael disassemble ./binary --function main
+## Supported files and architectures
 
-# Data extraction
-arael strings ./binary --min-length 6
-arael imports ./binary
-arael exports ./binary
-
-# Flow analysis
-arael xrefs ./binary --address 0x401000
-arael callgraph ./binary --format mermaid --root main
-
-# Utilities
-arael hexdump ./binary --address 0x401000 --length 128
-arael yara ./binary
-arael report ./binary --output report.html
-arael report --from-json ./analysis.json --output report.html
-arael report --from-cache <row-id-or-sha256> --output report.html --open
-arael cache --list
-arael benchmark-agents ./challenges --format html --output agent-run.html
-
-# LLM queries (v2.6)
-arael ask ./binary -q "Is this malicious?"
-arael ask ./binary -q summary -p ollama
-arael ask --list-templates
-
-# Interactive and batch
-arael shell ./binary
-arael batch "./samples/*.exe" --output ./results
-```
-
-### MCP tools (for LLMs)
-```python
-# LLM-optimized context (v2.6)
-context = await arael_context({"filepath": "./binary"})
-# Returns: classification, behaviors, iocs, mitreAttack, riskAssessment
-
-# Full analysis
-result = await arael_analyze({"filepath": "./binary"})
-
-# Decompile
-code = await arael_decompile({"filepath": "./binary", "function": "main"})
-
-# Cross-references
-xrefs = await arael_xrefs({"filepath": "./binary", "address": "0x401000"})
-```
-
-### Slash commands (Claude Code)
-
-| Command | Description |
-|---------|-------------|
-| `/arael` | Full binary analysis |
-| `/decompile` | Decompile function |
-| `/disasm` | Disassemble |
-| `/xrefs` | Cross-references |
-| `/callgraph` | Call graph |
-| `/strings` | Search strings |
-| `/imports` | List imports |
-| `/hexdump` | Raw bytes |
-
----
-
-## Command Reference
-
-### Core Analysis
-| Command | Description | Output |
-|---------|-------------|--------|
-| `analyze` | Full Ghidra analysis | JSON: binary, functions[], strings[], imports[], exports[] |
-| `context` | LLM-optimized context (v2.6) | JSON: classification, behaviors[], mitreAttack{}, iocs{}, riskAssessment |
-| `ask` | Ask LLM questions (v2.6) | LLM response with analysis context |
-| `functions` | List functions | JSON array: name, address, size |
-| `decompile` | C pseudocode | String: decompiled code |
-| `disassemble` | Assembly listing | JSON array: instructions |
-| `strings` | Extract strings | JSON array: value, address, xrefs[] |
-| `imports` | Import analysis | JSON: by library with categories, risk levels |
-| `exports` | Export listing | JSON array: name, address, type |
-| `xrefs` | Cross-references | JSON array: from/to address, type |
-| `callgraph` | Call graph | JSON/DOT/Mermaid |
-| `hexdump` | Byte dump | Formatted hex/ASCII |
-| `yara` | Pattern scanning | JSON: rule matches |
-| `shell` | Interactive REPL | Commands: decompile, disasm, xrefs, etc. |
-| `batch` | Multi-binary analysis | JSON files per binary |
-| `report` | HTML report | Standalone HTML |
-
-### Reports and Cache
-`arael report` can render from a binary, a saved `AnalysisResult` JSON file, or the
-SQLite analysis cache. Cached and JSON reports do not start Ghidra.
-
-```bash
-arael report ./binary -o report.html
-arael report --from-json ./analysis.json -o report.html
-arael report --from-cache <row-id|cache-key|sha256|path> -o report.html --open
-arael report ./binary --cache-only -o report.html
-```
-
-Cache inspection:
-```bash
-arael cache --stats
-arael cache --list --limit 50
-arael cache --show <identifier> --json
-arael cache --export <identifier> -o analysis.json
-```
-
-Benchmark reports support HTML:
-```bash
-arael benchmark ./samples --format html -o benchmark.html
-arael benchmark-agents ./challenges --format html -o agent-benchmark.html
-```
-
-### Security Analysis (v2.6)
-- **Behavior Detection**: Network client/server, process injection, credential theft, persistence, anti-debug, keylogging, file encryption
-- **MITRE ATT&CK**: T1055 (Injection), T1547.001 (Registry Run Keys), T1071 (C2), T1486 (Ransomware), T1555 (Credentials), etc.
-- **IOC Extraction**: IPv4/IPv6, domains, URLs, emails, file paths, registry keys, mutexes, user agents
-- **Import Risk**: 483 functions categorized (Network, Crypto, Process, Injection, AntiDebug, Persistence)
-- **Packing Detection**: UPX, PyInstaller, Themida, VMProtect + entropy analysis
-
-### Multi-Format Support
 | Format | Architectures |
-|--------|---------------|
-| ELF | x86_64, x86, ARM64, ARM32, MIPS, RISC-V |
-| PE | x86_64, x86, ARM64, ARM32 |
-| Mach-O | x86_64, ARM64 (Apple Silicon) |
-| MZ/COM/RAW | 16-bit DOS, boot sectors |
+|---|---|
+| ELF | x86-64, x86, ARM, AArch64, MIPS, PowerPC, RISC-V |
+| PE | x86-64, x86, ARM, AArch64 |
+| Mach-O | x86-64, x86, ARM, AArch64, PowerPC |
+| MZ / COM | 16-bit x86 (COM must use `.com`) |
+| Raw boot sector | 16-bit x86; `.bin` ending in `55 AA` |
 
----
+Quality depends on Ghidra's loader and processor module. The most exercised paths are x86/x86-64 ELF and PE.
 
-## YARA Scanning
+## Cache and output
 
-| Rule Set | Rules | Description |
-|----------|-------|-------------|
-| builtin | 43 | Packers, crypto, shellcode, evasion |
-| reversinglabs | 310 | Malware families (optional) |
-| all | 353 | Combined |
+SQLite cache lives at `~/.arael/cache/analysis.db` (keyed by file hash + version metadata; `--force` re-analyzes). Default outputs: `batch` → `./arael_output/`, `report` → `./report.html`, `benchmark*` HTML without `--output` → `./.arael/benchmark-results/...`, agent artifacts → `<report>.artifacts/`.
 
-```bash
-arael yara ./binary                      # Built-in rules
-arael yara ./binary --ruleset all        # All rules
-arael yara ./binary --category ransomware
-```
+## Troubleshooting
 
----
+- **`GHIDRA_PATH not set` / `analyzeHeadless not found`** — point `GHIDRA_PATH` at the extracted distribution root (containing `support/analyzeHeadless[.bat]`), not the ZIP, `Ghidra/` subdir, or a source checkout.
+- **`pyghidra not installed`** — install into the exact `ARAEL_PYTHON` interpreter: `"<python>" -m pip install "pyghidra>=3.0"`.
+- **Java missing / wrong version** — install 64-bit JDK 21, set `JAVA_HOME`, open a new terminal, check `java -version`.
+- **No global `arael`** — `npm run build && npm link`, or use `node dist/cli/index.js`.
+- **`.env` works in repo but not elsewhere** — set OS env vars or embed them in the MCP config.
+- **MCP tools not visible** — confirm the build, that the path is `dist/mcp/server.js`, absolute paths with escaped backslashes on Windows, `GHIDRA_PATH`/`ARAEL_PYTHON` in the MCP env, then restart the client.
+- **Slow analysis** — Ghidra startup/decompilation is expensive; allow 10–60s for ordinary files, longer for large/packed ones; reuse the cache and raise benchmark timeouts.
+
+More detail in [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## Development
 
 ```bash
-npm test              # All tests
-npm run test:unit     # Unit only
-npm run test:integration
-npm run test:coverage
+npm install && npm run build
+npm run lint
+npm test                 # npm run test:unit | test:integration | test:coverage
 ```
 
-### Project Structure
-```
-arael/
-├── src/
-│   ├── analysis/     # v2.6: behavior-detector, ioc-extractor, mitre-mapper, import-database, string-xrefs
-│   ├── llm/          # v2.6: LLM providers (OpenAI, Anthropic, Google, Ollama), prompts
-│   ├── cli/          # CLI commands including context and ask
-│   ├── mcp/          # MCP server & handlers
-│   ├── ghidra/       # Ghidra integration
-│   ├── cache/        # SQLite caching
-│   └── utils/        # Packing, preflight, YARA
-├── tests/
-└── docs/             # LOCAL_LLM_PROMPT.md/.xml
-```
-
----
-
-## Documentation
-
-- [Installation Guide](docs/INSTALLATION.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Local LLM Integration](docs/LOCAL_LLM_PROMPT.md) - System prompts for Ollama/llama.cpp
-- [PRD v2.6](docs/PRD_Arael_v2.6.md) - Product requirements
-
----
-
-## Roadmap
-
-### Complete (v2.6)
-- **Phase 1-2**: Foundation, PyGhidra, core tools
-- **Phase 3**: Advanced tools (xrefs, callgraph, disassemble)
-- **Phase 4**: Packing detection, import categorization
-- **Phase 5**: x86 16/32-bit, .pyc decompilation
-- **Phase 6**: Interactive shell, batch, YARA, reports, ARM
-- **Phase 7**: LLM Context Layer - context command, behaviors, MITRE, IOCs
-- **Phase 8**: `arael ask` - Natural language queries with LLM providers
-
----
+Integration tests require a working Ghidra/PyGhidra setup; unit tests usually do not. Source is organized under `src/` (`analysis`, `benchmark`, `cache`, `cli`, `ghidra`, `llm`, `mcp`, `output`, `utils`) with tests under `tests/`. See also [Installation notes](docs/INSTALLATION.md) and [Local LLM integration](docs/LOCAL_LLM_PROMPT.md).
 
 ## Acknowledgments
 
-- **Ghidra** by NSA
-- **PyGhidra** for Python integration
-- **ReversingLabs** for [YARA rules](https://github.com/reversinglabs/reversinglabs-yara-rules)
-- **MITRE ATT&CK** for technique framework
+- [Ghidra](https://github.com/NationalSecurityAgency/ghidra) by the National Security Agency
+- [PyGhidra](https://pypi.org/project/pyghidra/) · [MITRE ATT&CK](https://attack.mitre.org/) · [ReversingLabs YARA rules](https://github.com/reversinglabs/reversinglabs-yara-rules)
 
----
+## License
 
-**MIT License** | Built for the cybersecurity community
+[MIT](LICENSE)

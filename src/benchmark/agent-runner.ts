@@ -6,6 +6,7 @@ import { expandArchives, isArchivePath } from './archives';
 import { loadPricingTable } from './manifest';
 import { calculateCost } from './llm';
 import { collectReproducibilityMetadata } from './metadata';
+import { runOllamaAgent, buildAbsoluteFileListing } from './ollama-agent';
 import type {
   AgentBenchmarkOptions,
   AgentBenchmarkRecord,
@@ -23,7 +24,7 @@ import type {
 const ENGINE_PROVIDER: Record<AgentEngine, string> = {
   claude: 'anthropic',
   codex: 'openai',
-  gemini: 'google',
+  antigravity: 'google',
   ollama: 'ollama'
 };
 
@@ -58,8 +59,7 @@ export function parseAgentSpecs(value?: string): AgentSpec[] {
       { engine: 'claude', model: 'claude-opus-4-8', araelMcp: false },
       { engine: 'codex', model: 'gpt-5.5', araelMcp: true },
       { engine: 'codex', model: 'gpt-5.5', araelMcp: false },
-      { engine: 'gemini', model: 'gemini-3-pro', araelMcp: true },
-      { engine: 'gemini', model: 'gemini-3-pro', araelMcp: false }
+      { engine: 'antigravity', model: 'Gemini 3.5 Flash (Pro)', araelMcp: false }
     ];
   }
 
@@ -67,10 +67,12 @@ export function parseAgentSpecs(value?: string): AgentSpec[] {
     // Local model names contain colons (e.g. ollama:qwen3.5:4b), so split on the first colon only.
     const trimmed = part.trim();
     const sep = trimmed.indexOf(':');
-    const engine = sep === -1 ? trimmed : trimmed.slice(0, sep);
+    const rawEngine = sep === -1 ? trimmed : trimmed.slice(0, sep);
+    // `agy` is the binary name; normalize it to the canonical `antigravity` engine key.
+    const engine = rawEngine === 'agy' ? 'antigravity' : rawEngine;
     const modelSpec = sep === -1 ? '' : trimmed.slice(sep + 1);
-    if (engine !== 'codex' && engine !== 'claude' && engine !== 'gemini' && engine !== 'ollama') {
-      throw new Error(`Invalid agent engine in spec "${part}". Use codex:<model>, claude:<model>, gemini:<model>, or ollama:<model> (append +arael to attach the Arael MCP server; ignored for ollama).`);
+    if (engine !== 'codex' && engine !== 'claude' && engine !== 'antigravity' && engine !== 'ollama') {
+      throw new Error(`Invalid agent engine in spec "${part}". Use codex:<model>, claude:<model>, antigravity:<model> (alias agy:), or ollama:<model> (append +arael to attach the Arael MCP server).`);
     }
     if (!modelSpec) {
       throw new Error(`Missing model in agent spec "${part}"`);
@@ -81,15 +83,19 @@ export function parseAgentSpecs(value?: string): AgentSpec[] {
     if (!model) {
       throw new Error(`Missing model in agent spec "${part}"`);
     }
-    // The local baseline runs prompt-only, so MCP attachment doesn't apply to ollama.
-    return { engine, model, araelMcp: engine === 'ollama' ? false : araelMcp };
+    // Ollama bare runs prompt-only (single-shot static context); ollama+arael drives
+    // an agentic /api/chat tool loop with the Arael MCP server attached. Antigravity
+    // attaches Arael via its GLOBAL MCP config (~/.gemini/config/mcp_config.json),
+    // not per-invocation flags, so a single run must not mix antigravity bare and
+    // antigravity+arael cells.
+    return { engine, model, araelMcp };
   });
 }
 
 interface AraelWiring {
   /** Absolute path to the Arael MCP server entrypoint (dist/mcp/server.js). */
   serverPath: string;
-  /** Claude-format MCP config file (also reused as the Gemini settings source). */
+  /** Claude-format MCP config file passed to claude/codex +arael instances. */
   mcpConfigPath: string;
 }
 
@@ -436,7 +442,21 @@ async function runAgentOnChallenge(input: {
   if (!input.options.force && fs.existsSync(recordPath)) {
     const cached = readCachedRecord(recordPath);
     if (cached) {
-      return { ...cached, resumed: true };
+      // Ground truth can be added after an expensive agent run. Re-grade from
+      // the cached artifacts so resuming does not require re-running the model.
+      const stdout = readArtifact(stdoutPath);
+      const stderr = readArtifact(stderrPath);
+      const parsed = parseAgentOutput(cached.agent, stdout);
+      const grade = gradeFlags(parsed.text, stderr, expectedFlags);
+      const regraded: AgentBenchmarkRecord = {
+        ...cached,
+        flag: grade.flag,
+        flagFound: grade.flagFound,
+        flagCorrect: grade.flagCorrect,
+        resumed: false
+      };
+      fs.writeFileSync(recordPath, JSON.stringify(regraded, null, 2));
+      return { ...regraded, resumed: true };
     }
   }
 
@@ -444,7 +464,34 @@ async function runAgentOnChallenge(input: {
   // context extracted from the challenge and treat its reply as the report.
   let result: CommandResult;
   let parsedUsage: AgentTokenUsage | null = null;
-  if (input.agent.engine === 'ollama') {
+  if (input.agent.engine === 'ollama' && input.agent.araelMcp) {
+    // Agentic local run: drive the model through Ollama's tool-calling loop with the
+    // Arael MCP server attached, so it can disassemble/decompile/inspect like the
+    // cloud agents instead of reasoning blind over a fixed context.
+    const serverPath = input.wiring?.serverPath
+      ?? path.resolve(path.join(__dirname, '..', 'mcp', 'server.js'));
+    const agentRun = await runOllamaAgent({
+      url: input.options.ollamaUrl,
+      model: input.agent.model,
+      prompt: input.prompt,
+      challengePath: input.challenge.path,
+      fileListing: buildAbsoluteFileListing(input.challenge.path),
+      araelServerPath: serverPath,
+      timeoutSeconds: input.options.timeoutSeconds
+    });
+    result = {
+      stdout: agentRun.stdout,
+      stderr: agentRun.stderr,
+      exitCode: agentRun.exitCode,
+      timedOut: agentRun.timedOut,
+      errorMessage: agentRun.errorMessage
+    };
+    parsedUsage = normalizeTokenUsage({
+      inputTokens: agentRun.inputTokens,
+      outputTokens: agentRun.outputTokens,
+      totalTokens: null
+    });
+  } else if (input.agent.engine === 'ollama') {
     const ollamaPrompt = `${input.prompt}\n\nChallenge directory: ${input.challenge.path}\n\n${buildChallengeContext(input.challenge.path)}`;
     const ollama = await runOllama({
       url: input.options.ollamaUrl,
@@ -455,14 +502,15 @@ async function runAgentOnChallenge(input: {
     result = ollama.result;
     parsedUsage = ollama.usage;
   } else {
-    // Gemini has no inline-MCP CLI flag; it reads .gemini/settings.json from cwd.
-    if (input.agent.engine === 'gemini' && input.agent.araelMcp && input.wiring) {
-      writeGeminiSettings(input.challenge.path, input.wiring.serverPath);
-    }
-    result = await runCommand(command, {
-      cwd: input.challenge.path,
-      timeoutSeconds: input.options.timeoutSeconds
-    });
+    result = input.agent.engine === 'antigravity'
+      ? await runAntigravityCommand(command, {
+          cwd: input.challenge.path,
+          timeoutSeconds: input.options.timeoutSeconds
+        })
+      : await runCommand(command, {
+          cwd: input.challenge.path,
+          timeoutSeconds: input.options.timeoutSeconds
+        });
   }
 
   fs.writeFileSync(stdoutPath, result.stdout);
@@ -529,6 +577,14 @@ function readCachedRecord(recordPath: string): AgentBenchmarkRecord | null {
   }
 }
 
+function readArtifact(artifactPath: string): string {
+  try {
+    return fs.readFileSync(artifactPath, 'utf-8');
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Pull the human-readable report text and token usage out of an agent's stdout.
  * Claude in JSON mode emits a `{ result, usage }` envelope; other engines emit
@@ -561,18 +617,19 @@ function gradeFlags(text: string, stderr: string, expectedFlags: string[]): {
   flagCorrect: boolean | null;
 } {
   const haystack = `${text}\n${stderr}`;
+  const normalizedHaystack = haystack.toLowerCase();
   const candidates = detectFlags(haystack);
   const flagCorrect = expectedFlags.length === 0
     ? null
     : expectedFlags.some(expected => {
         const needle = expected.toLowerCase();
-        return haystack.toLowerCase().includes(needle);
+        return normalizedHaystack.includes(needle);
       });
 
   // Prefer the matching expected flag as the recorded flag when graded correct.
   let flag = candidates[0] ?? null;
   if (flagCorrect && expectedFlags.length > 0) {
-    flag = expectedFlags.find(expected => haystack.toLowerCase().includes(expected.toLowerCase())) ?? flag;
+    flag = expectedFlags.find(expected => normalizedHaystack.includes(expected.toLowerCase())) ?? flag;
   }
 
   return {
@@ -588,7 +645,7 @@ export function detectFlags(text: string): string[] {
   const seen = new Set<string>();
   const patterns = [
     /[A-Za-z0-9_.+-]+@flare-on\.com/g,
-    /\b[A-Za-z0-9_]{2,}\{[^}\n]{1,256}\}/g
+    /\b[A-Za-z0-9_]{2,64}\{[^}\n]{1,256}\}/g
   ];
   for (const pattern of patterns) {
     for (let match = pattern.exec(text); match !== null; match = pattern.exec(text)) {
@@ -773,20 +830,22 @@ function buildAgentCommand(
     return command;
   }
 
-  if (agent.engine === 'gemini') {
+  if (agent.engine === 'antigravity') {
+    // agy's --print flag takes the prompt as its value; it is not a boolean flag
+    // followed by a positional prompt. Keep it last so the full benchmark prompt
+    // is consumed correctly. MCP is not attached (antigravity runs bare).
     const command = [
-      options.geminiBin,
+      options.antigravityBin,
       '--model',
       agent.model,
-      '--yolo',
-      '--include-directories',
-      challenge.path
+      '--print-timeout',
+      `${options.timeoutSeconds}s`,
+      '--add-dir',
+      challenge.path,
+      '--dangerously-skip-permissions',
+      '--print',
+      fullPrompt
     ];
-    if (useArael) {
-      // Settings file (.gemini/settings.json) is written into cwd at run time.
-      command.push('--allowed-mcp-server-names', 'arael');
-    }
-    command.push('--prompt', fullPrompt);
     return command;
   }
 
@@ -813,21 +872,6 @@ function buildAgentCommand(
   }
   command.push(fullPrompt);
   return command;
-}
-
-/** Write a .gemini/settings.json into the challenge dir so Gemini can load the Arael MCP server. */
-function writeGeminiSettings(challengePath: string, serverPath: string): void {
-  const settingsDir = path.join(challengePath, '.gemini');
-  fs.mkdirSync(settingsDir, { recursive: true });
-  const settings = {
-    mcpServers: {
-      arael: {
-        command: 'node',
-        args: [serverPath]
-      }
-    }
-  };
-  fs.writeFileSync(path.join(settingsDir, 'settings.json'), JSON.stringify(settings, null, 2));
 }
 
 /**
@@ -979,9 +1023,31 @@ interface CommandResult {
   errorMessage: string | null;
 }
 
+/**
+ * Antigravity only emits its print-mode response when attached to a terminal.
+ * On Windows, relay it through pywinpty while keeping stdout capturable by the
+ * benchmark process. Other platforms retain the normal subprocess path.
+ */
+function runAntigravityCommand(command: string[], options: {
+  cwd: string;
+  timeoutSeconds: number;
+}): Promise<CommandResult> {
+  if (process.platform !== 'win32') {
+    return runCommand(command, options);
+  }
+
+  const python = process.env.ARAEL_PYTHON || 'python';
+  const ptyRunner = path.join(__dirname, 'windows-pty.py');
+  return runCommand([python, ptyRunner, '--', ...command], {
+    ...options,
+    directOnWindows: true
+  });
+}
+
 function runCommand(command: string[], options: {
   cwd: string;
   timeoutSeconds: number;
+  directOnWindows?: boolean;
 }): Promise<CommandResult> {
   return new Promise(resolve => {
     const [bin, ...args] = command;
@@ -996,7 +1062,7 @@ function runCommand(command: string[], options: {
     // arg at an embedded newline, so collapse newlines (only affects the prompt arg).
     let spawnBin = bin;
     let spawnArgs = args;
-    if (process.platform === 'win32') {
+    if (process.platform === 'win32' && !options.directOnWindows) {
       const comspec = process.env.ComSpec || 'cmd.exe';
       spawnBin = comspec;
       spawnArgs = ['/d', '/s', '/c', ...command.map(part => part.replace(/\r?\n/g, ' '))];

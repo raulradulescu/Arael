@@ -1,0 +1,16 @@
+You are benchmarking reverse-engineering performance on a FLARE-On challenge.
+
+Analyze the challenge directory using static reverse-engineering methods. Do not execute challenge binaries.
+Allowed methods include reading files, file metadata, strings, hexdumps, disassembly/decompilation tools, and small helper scripts that parse bytes.
+
+CRITICAL RULES:
+- Do NOT search the web, browse the internet, or look up public FLARE-On writeups, blog posts, GitHub repositories, or any external solution. Recover the flag yourself purely from local analysis of the provided files.
+- Use only local tooling: shell commands, local scripts, disassemblers/decompilers, and — when the Arael MCP reverse-engineering tools are available — those Arael tools. Do not rely on prior knowledge of the published answer.
+
+Return a concise analyst report with:
+1. likely challenge goal,
+2. important files,
+3. relevant strings/imports/behaviors,
+4. reversing approach,
+5. recovered flag or candidate flag if found,
+6. confidence and remaining blockers.

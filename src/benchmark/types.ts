@@ -4,7 +4,7 @@ import type { YaraScanResult } from '../utils/yara';
 
 export type BenchmarkFormat = 'json' | 'jsonl' | 'csv' | 'markdown' | 'latex' | 'html';
 export type AgentBenchmarkFormat = 'json' | 'jsonl' | 'csv' | 'variant-csv' | 'markdown' | 'html';
-export type AgentEngine = 'codex' | 'claude' | 'gemini' | 'ollama';
+export type AgentEngine = 'codex' | 'claude' | 'antigravity' | 'ollama';
 
 export type BenchmarkMetricName =
   | 'functions'
@@ -282,7 +282,8 @@ export interface AgentBenchmarkOptions {
   maxChallenges?: number;
   codexBin: string;
   claudeBin: string;
-  geminiBin: string;
+  /** Antigravity (agy) CLI executable for antigravity:* instances. */
+  antigravityBin: string;
   /** Base URL of the Ollama server for local-model (ollama:*) instances. */
   ollamaUrl: string;
   /** Path to the Arael MCP server entrypoint (dist/mcp/server.js) for +arael instances. */

@@ -618,7 +618,7 @@ program
   .option('--ground-truth <file>', 'JSON map of challengeId -> expected flag(s) for auto-grading')
   .option('--codex-bin <path>', 'Codex executable', 'codex')
   .option('--claude-bin <path>', 'Claude executable', 'claude')
-  .option('--gemini-bin <path>', 'Gemini executable', 'gemini')
+  .option('--antigravity-bin <path>', 'Antigravity (agy) executable for antigravity:* (alias agy:) instances', 'agy')
   .option('--ollama-host <url>', 'Ollama server base URL for ollama:* local-model instances', 'http://localhost:11434')
   .option('--arael-server <path>', 'Arael MCP server entrypoint for +arael instances (default: bundled dist/mcp/server.js)')
   .option('--prompt <file>', 'Custom prompt file for agent runs')
@@ -639,7 +639,7 @@ program
     groundTruth?: string;
     codexBin?: string;
     claudeBin?: string;
-    geminiBin?: string;
+    antigravityBin?: string;
     ollamaHost?: string;
     araelServer?: string;
     prompt?: string;
@@ -675,7 +675,7 @@ program
         groundTruthPath: options.groundTruth,
         codexBin: options.codexBin ?? 'codex',
         claudeBin: options.claudeBin ?? 'claude',
-        geminiBin: options.geminiBin ?? 'gemini',
+        antigravityBin: options.antigravityBin ?? 'agy',
         ollamaUrl: options.ollamaHost ?? 'http://localhost:11434',
         araelServerPath: options.araelServer,
         promptPath: options.prompt,
