@@ -76,3 +76,25 @@ test/
 tests/fixtures/
 tmpclaude*
 reversinglabs*/
+
+# Generated reports (HTML reports are build output, not source)
+/*.html
+
+# Ad-hoc benchmark run artifacts dropped at repo root
+/c_easy_wsl.json
+/cpp_hard_wsl.json
+*.cimg
+
+# FLARE-On ground-truth flags (challenge spoilers / local benchmark data)
+flare-flags.json
+
+# Bachelor's thesis (kept on disk, not part of the code repo)
+bachelors-thesis/
+Arael-licenta-Raul.pdf
+
+# GSD workflow scaffolding (internal planning state, not product code)
+.planning/
+
+# Agent config (interactive slash-command prompts and agent guides)
+.claude/commands/
+AGENTS.md

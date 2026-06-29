@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arael Agent Benchmark Report</title>
+  <style>
+
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79b8ff;
+      --danger: #f85149;
+      --warning: #d29922;
+      --success: #3fb950;
+      --purple: #a371f7;
+      --pink: #db61a2;
+      --gradient-start: #58a6ff;
+      --gradient-end: #a371f7;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg-primary: #f6f8fa;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #f0f3f6;
+        --border: #d0d7de;
+        --text: #24292f;
+        --text-muted: #57606a;
+        --accent: #0969da;
+        --accent-hover: #0550ae;
+        --danger: #cf222e;
+        --warning: #9a6700;
+        --success: #1a7f37;
+        --purple: #8250df;
+        --pink: #bf3989;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .header {
+      background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    .header-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 1.75rem;
+      font-weight: 600;
+      background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem 1.5rem;
+      margin-top: 0.5rem;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+    .container { max-width: 1400px; margin: 0 auto; padding: 0 2rem 2rem; }
+    .section { margin-bottom: 2rem; }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-header h2 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .section-icon {
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-tertiary);
+      border-radius: 6px;
+      font-size: 0.875rem;
+    }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+    .grid-2 { grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); }
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+    .card-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .card-value {
+      margin-top: 0.5rem;
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .card-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: var(--text-muted); font-size: 0.875rem; }
+    .info-value { font-weight: 500; font-family: "SF Mono", Consolas, monospace; font-size: 0.875rem; text-align: right; }
+    .hash-value, code, .mono {
+      font-family: "SF Mono", Consolas, monospace;
+      font-size: 0.8rem;
+      background: var(--bg-tertiary);
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      color: var(--accent);
+      word-break: break-all;
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .toolbar-group { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
+    .search-box input {
+      min-width: 260px;
+      max-width: 100%;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      font: inherit;
+    }
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      user-select: none;
+    }
+    .table-wrapper {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      background: var(--bg-tertiary);
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    th[data-sortable="true"] { cursor: pointer; }
+    th[data-sortable="true"]::after { content: " \2195"; opacity: 0.45; }
+    td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--bg-tertiary); }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .badge-success { background: rgba(63, 185, 80, 0.15); color: var(--success); border-color: rgba(63, 185, 80, 0.45); }
+    .badge-warn { background: rgba(210, 153, 34, 0.15); color: var(--warning); border-color: rgba(210, 153, 34, 0.45); }
+    .badge-danger { background: rgba(248, 81, 73, 0.15); color: var(--danger); border-color: rgba(248, 81, 73, 0.45); }
+    .badge-muted { background: rgba(139, 148, 158, 0.15); color: var(--text-muted); border-color: rgba(139, 148, 158, 0.35); }
+    .badge-accent { background: rgba(88, 166, 255, 0.15); color: var(--accent); border-color: rgba(88, 166, 255, 0.45); }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin: 0.125rem;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+      background: rgba(88, 166, 255, 0.15);
+      color: var(--accent);
+    }
+    .tag-danger { background: rgba(248, 81, 73, 0.15); color: var(--danger); }
+    .tag-warn { background: rgba(210, 153, 34, 0.15); color: var(--warning); }
+    .tag-success { background: rgba(63, 185, 80, 0.15); color: var(--success); }
+    .bar {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      min-width: 110px;
+      height: 1.35rem;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+      vertical-align: middle;
+    }
+    .bar-fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      background: linear-gradient(90deg, var(--success), var(--accent));
+    }
+    .bar-label {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .icon-button {
+      margin-left: 0.5rem;
+      border: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      color: var(--text-muted);
+      border-radius: 5px;
+      padding: 0.2rem 0.45rem;
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+    .icon-button:hover { border-color: var(--accent); color: var(--accent); }
+    .collapsible {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      overflow: hidden;
+    }
+    .collapsible summary {
+      cursor: pointer;
+      padding: 0.85rem 1rem;
+      font-weight: 700;
+      color: var(--text);
+      background: var(--bg-tertiary);
+    }
+    .collapsible-body { padding: 1rem; }
+    .function-details { display: grid; gap: 0.75rem; }
+    .function-detail { scroll-margin-top: 1rem; }
+    .function-detail summary {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .function-meta { margin-bottom: 1rem; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .compact-card { padding: 1rem; }
+    .link-list {
+      list-style: none;
+      margin: 0.75rem 0 0;
+      padding: 0;
+      display: grid;
+      gap: 0.35rem;
+    }
+    .code-block,
+    .hexdump-block {
+      margin: 0;
+      max-height: 520px;
+      overflow: auto;
+      white-space: pre;
+      tab-size: 2;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      color: var(--text);
+      font-family: "SF Mono", Consolas, monospace;
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+    .hexdump-block { color: var(--text-muted); }
+    .error-block { color: var(--danger); }
+    .analysis-note {
+      margin-top: 1rem;
+      color: var(--text-muted);
+    }
+    .analysis-note p { margin: 0.35rem 0 0; }
+    .muted { color: var(--text-muted); }
+    .danger { color: var(--danger); }
+    .warn { color: var(--warning); }
+    .success { color: var(--success); }
+    .nowrap { white-space: nowrap; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    footer {
+      margin-top: 3rem;
+      padding: 2rem;
+      text-align: center;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+    .footer-meta { margin-top: 0.5rem; font-size: 0.75rem; }
+    @media (max-width: 768px) {
+      .header-content { flex-direction: column; }
+      .header-meta { flex-direction: column; gap: 0.5rem; }
+      .grid, .grid-2 { grid-template-columns: 1fr; }
+      .container { padding: 0 1rem 1rem; }
+      .search-box input { min-width: 0; width: 100%; }
+      .toolbar { align-items: stretch; }
+      .toolbar-group { width: 100%; }
+    }
+  
+
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-content">
+      <div>
+        <h1>Arael Agent Benchmark Report</h1>
+        <div class="header-meta">
+          <span>Run: 3a6c07ed-463e-45a5-9c80-47574c55ade3</span>
+          <span>Jun 28, 2026, 11:42 AM</span>
+          <span>5 challenges</span>
+          <span>6 agents</span>
+          <span>30 runs</span>
+        </div>
+      </div>
+      <span class="badge badge-accent">Agent Benchmark</span>
+    </div>
+  </div>
+  <div class="container">
+    
+    <div class="section">
+      <div class="section-header"><span class="section-icon">#</span><h2>Summary</h2></div>
+      <div class="grid">
+        
+    <div class="card stat-card">
+      <div class="card-title">Solved</div>
+      <div class="card-value">0/30</div>
+      <div class="card-label">0% solve rate</div>
+    </div>
+  
+        
+    <div class="card stat-card">
+      <div class="card-title">Graded</div>
+      <div class="card-value">30</div>
+      <div class="card-label">Ground-truth checked</div>
+    </div>
+  
+        
+    <div class="card stat-card">
+      <div class="card-title">Challenges</div>
+      <div class="card-value">5</div>
+      <div class="card-label">Targets</div>
+    </div>
+  
+        
+    <div class="card stat-card">
+      <div class="card-title">Agents</div>
+      <div class="card-value">6</div>
+      <div class="card-label">Variants</div>
+    </div>
+  
+        
+    <div class="card stat-card">
+      <div class="card-title">Total Tokens</div>
+      <div class="card-value">239,959</div>
+      <div class="card-label">All runs</div>
+    </div>
+  
+        
+    <div class="card stat-card">
+      <div class="card-title">Total Cost</div>
+      <div class="card-value">$0.0000</div>
+      <div class="card-label">Estimated USD</div>
+    </div>
+  
+        
+    <div class="card stat-card">
+      <div class="card-title">Avg Duration</div>
+      <div class="card-value">383.376s</div>
+      <div class="card-label">Per run</div>
+    </div>
+  
+        
+    <div class="card stat-card">
+      <div class="card-title">Total Duration</div>
+      <div class="card-value">11501.292s</div>
+      <div class="card-label">Sum of run durations</div>
+    </div>
+  
+      </div>
+    </div>
+  
+    
+    <div class="section">
+      <div class="section-header"><span class="section-icon">^</span><h2>Leaderboard</h2></div>
+      
+    <div class="table-wrapper">
+      <table id="agent-leaderboard-table">
+        <thead>
+          <tr>
+            <th data-sortable="true">Engine</th><th data-sortable="true">Model</th><th data-sortable="true">Arael</th><th data-sortable="true">Runs</th><th data-sortable="true">Solves</th><th data-sortable="true">Solve Rate</th><th data-sortable="true">Avg Duration</th><th data-sortable="true">Tokens</th><th data-sortable="true">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>ollama</td><td>qwen2.5-coder:7b</td><td><span class="badge badge-accent">+arael</span></td><td>5</td><td>0</td><td>
+    <span class="bar" title="0%">
+      <span class="bar-fill" style="width: 0.00%"></span>
+      <span class="bar-label">0%</span>
+    </span>
+  </td><td>790.577s</td><td>114,501</td><td>$0.0000</td></tr><tr><td>ollama</td><td>llama3.1:8b</td><td><span class="badge badge-accent">+arael</span></td><td>5</td><td>0</td><td>
+    <span class="bar" title="0%">
+      <span class="bar-fill" style="width: 0.00%"></span>
+      <span class="bar-label">0%</span>
+    </span>
+  </td><td>464.423s</td><td>56,555</td><td>$0.0000</td></tr><tr><td>ollama</td><td>qwen3.5:4b</td><td><span class="badge badge-accent">+arael</span></td><td>5</td><td>0</td><td>
+    <span class="bar" title="0%">
+      <span class="bar-fill" style="width: 0.00%"></span>
+      <span class="bar-label">0%</span>
+    </span>
+  </td><td>240.838s</td><td>41,324</td><td>$0.0000</td></tr><tr><td>ollama</td><td>gemma3:4b</td><td><span class="badge badge-accent">+arael</span></td><td>5</td><td>0</td><td>
+    <span class="bar" title="0%">
+      <span class="bar-fill" style="width: 0.00%"></span>
+      <span class="bar-label">0%</span>
+    </span>
+  </td><td>57.445s</td><td>6,719</td><td>$0.0000</td></tr><tr><td>ollama</td><td>phi4-mini</td><td><span class="badge badge-accent">+arael</span></td><td>5</td><td>0</td><td>
+    <span class="bar" title="0%">
+      <span class="bar-fill" style="width: 0.00%"></span>
+      <span class="bar-label">0%</span>
+    </span>
+  </td><td>136.873s</td><td>20,860</td><td>$0.0000</td></tr><tr><td>ollama</td><td>hf.co/squ11z1/Mythos-nano:F16</td><td><span class="badge badge-accent">+arael</span></td><td>5</td><td>0</td><td>
+    <span class="bar" title="0%">
+      <span class="bar-fill" style="width: 0.00%"></span>
+      <span class="bar-label">0%</span>
+    </span>
+  </td><td>610.102s</td><td></td><td>$0.0000</td></tr>
+        </tbody>
+      </table>
+    </div>
+  
+    </div>
+  
+    
+    <div class="section">
+      <div class="section-header"><span class="section-icon">r</span><h2>Runs</h2></div>
+      <div class="toolbar">
+        <div class="toolbar-group">
+          
+    <label class="search-box">
+      <span class="sr-only">Search runs</span>
+      <input type="search" data-search-target="agent-runs-table" placeholder="Search runs">
+    </label>
+  
+          
+    <label class="toggle">
+      <input type="checkbox" data-solved-toggle="agent-runs-table">
+      <span>Solved only</span>
+    </label>
+  
+        </div>
+      </div>
+      
+    <div class="table-wrapper">
+      <table id="agent-runs-table">
+        <thead>
+          <tr>
+            <th data-sortable="true">Challenge</th><th data-sortable="true">Variant</th><th data-sortable="true">Run</th><th data-sortable="true">Status</th><th data-sortable="true">Solved</th><th data-sortable="true">Flag Found</th><th data-sortable="true">Flag Correct</th><th data-sortable="true">Flag</th><th data-sortable="true">Duration</th><th data-sortable="true">Tokens</th><th data-sortable="true">Cost</th><th data-sortable="true">Artifacts</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-solved="false"><td>1 - DrillBabyDrill</td><td>ollama:qwen2.5-coder:7b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>334.345s</td><td>11,092</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-qwen2.5-coder_7b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-qwen2.5-coder_7b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-qwen2.5-coder_7b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>1 - DrillBabyDrill</td><td>ollama:llama3.1:8b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>901.862s</td><td>27,084</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-llama3.1_8b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-llama3.1_8b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-llama3.1_8b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>1 - DrillBabyDrill</td><td>ollama:qwen3.5:4b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>98.724s</td><td>4,096</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-qwen3.5_4b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-qwen3.5_4b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-qwen3.5_4b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>1 - DrillBabyDrill</td><td>ollama:gemma3:4b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>92.310s</td><td>2,611</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-gemma3_4b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-gemma3_4b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-gemma3_4b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>1 - DrillBabyDrill</td><td>ollama:phi4-mini+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-success">yes</span></td><td><span class="badge badge-danger">no</span></td><td><span class="mono">FLAG{...}</span><button type="button" class="icon-button copy-button" data-copy="FLAG{...}" title="Copy flag" aria-label="Copy flag">Copy</button></td><td>234.657s</td><td>4,144</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-phi4-mini-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-phi4-mini-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-phi4-mini-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>1 - DrillBabyDrill</td><td>ollama:hf.co/squ11z1/Mythos-nano:F16+arael</td><td>0</td><td><span class="badge badge-danger">failed</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>610.215s</td><td></td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/1_-_DrillBabyDrill/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>2 - project_chimera</td><td>ollama:qwen2.5-coder:7b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>796.159s</td><td>45,808</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-qwen2.5-coder_7b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-qwen2.5-coder_7b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-qwen2.5-coder_7b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>2 - project_chimera</td><td>ollama:llama3.1:8b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>652.668s</td><td>12,156</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-llama3.1_8b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-llama3.1_8b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-llama3.1_8b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>2 - project_chimera</td><td>ollama:qwen3.5:4b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>353.826s</td><td>6,804</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-qwen3.5_4b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-qwen3.5_4b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-qwen3.5_4b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>2 - project_chimera</td><td>ollama:gemma3:4b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>32.872s</td><td>774</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-gemma3_4b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-gemma3_4b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-gemma3_4b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>2 - project_chimera</td><td>ollama:phi4-mini+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>55.488s</td><td>1,948</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-phi4-mini-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-phi4-mini-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-phi4-mini-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>2 - project_chimera</td><td>ollama:hf.co/squ11z1/Mythos-nano:F16+arael</td><td>0</td><td><span class="badge badge-danger">failed</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>609.563s</td><td></td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/2_-_project_chimera/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>3 - pretty_devilish_file</td><td>ollama:qwen2.5-coder:7b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>759.196s</td><td>16,762</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-qwen2.5-coder_7b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-qwen2.5-coder_7b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-qwen2.5-coder_7b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>3 - pretty_devilish_file</td><td>ollama:llama3.1:8b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>178.846s</td><td>3,559</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-llama3.1_8b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-llama3.1_8b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-llama3.1_8b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>3 - pretty_devilish_file</td><td>ollama:qwen3.5:4b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>271.188s</td><td>15,045</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-qwen3.5_4b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-qwen3.5_4b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-qwen3.5_4b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>3 - pretty_devilish_file</td><td>ollama:gemma3:4b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>82.605s</td><td>1,329</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-gemma3_4b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-gemma3_4b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-gemma3_4b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>3 - pretty_devilish_file</td><td>ollama:phi4-mini+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>162.159s</td><td>9,637</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-phi4-mini-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-phi4-mini-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-phi4-mini-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>3 - pretty_devilish_file</td><td>ollama:hf.co/squ11z1/Mythos-nano:F16+arael</td><td>0</td><td><span class="badge badge-danger">failed</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>609.723s</td><td></td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/3_-_pretty_devilish_file/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>4 - UnholyDragon</td><td>ollama:qwen2.5-coder:7b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>260.238s</td><td>8,862</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-qwen2.5-coder_7b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-qwen2.5-coder_7b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-qwen2.5-coder_7b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>4 - UnholyDragon</td><td>ollama:llama3.1:8b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>282.510s</td><td>7,795</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-llama3.1_8b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-llama3.1_8b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-llama3.1_8b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>4 - UnholyDragon</td><td>ollama:qwen3.5:4b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-success">yes</span></td><td><span class="badge badge-danger">no</span></td><td><span class="mono">flag{...}</span><button type="button" class="icon-button copy-button" data-copy="flag{...}" title="Copy flag" aria-label="Copy flag">Copy</button></td><td>225.897s</td><td>5,762</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-qwen3.5_4b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-qwen3.5_4b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-qwen3.5_4b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>4 - UnholyDragon</td><td>ollama:gemma3:4b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>41.434s</td><td>952</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-gemma3_4b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-gemma3_4b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-gemma3_4b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>4 - UnholyDragon</td><td>ollama:phi4-mini+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>118.127s</td><td>2,558</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-phi4-mini-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-phi4-mini-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-phi4-mini-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>4 - UnholyDragon</td><td>ollama:hf.co/squ11z1/Mythos-nano:F16+arael</td><td>0</td><td><span class="badge badge-danger">failed</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>609.418s</td><td></td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/4_-_UnholyDragon/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>5 - ntfsm</td><td>ollama:qwen2.5-coder:7b+arael</td><td>0</td><td><span class="badge badge-warn">timeout</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>1802.949s</td><td>31,977</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-qwen2.5-coder_7b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-qwen2.5-coder_7b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-qwen2.5-coder_7b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>5 - ntfsm</td><td>ollama:llama3.1:8b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>306.231s</td><td>5,961</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-llama3.1_8b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-llama3.1_8b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-llama3.1_8b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>5 - ntfsm</td><td>ollama:qwen3.5:4b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>254.555s</td><td>9,617</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-qwen3.5_4b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-qwen3.5_4b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-qwen3.5_4b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>5 - ntfsm</td><td>ollama:gemma3:4b+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>38.005s</td><td>1,053</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-gemma3_4b-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-gemma3_4b-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-gemma3_4b-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>5 - ntfsm</td><td>ollama:phi4-mini+arael</td><td>0</td><td><span class="badge badge-success">ok</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>113.933s</td><td>2,573</td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-phi4-mini-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-phi4-mini-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-phi4-mini-arael.stderr.txt">stderr</a></td></tr><tr data-solved="false"><td>5 - ntfsm</td><td>ollama:hf.co/squ11z1/Mythos-nano:F16+arael</td><td>0</td><td><span class="badge badge-danger">failed</span></td><td><span class="badge badge-danger">no</span></td><td><span class="badge badge-muted">no</span></td><td><span class="badge badge-danger">no</span></td><td></td><td>611.589s</td><td></td><td>$0.0000</td><td><a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.stdout.txt">stdout</a> · <a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.record.json">record</a> · <a href="flare-12345-ollama-agentic.html.artifacts/5_-_ntfsm/ollama-hf.co_squ11z1_Mythos-nano_F16-arael.stderr.txt">stderr</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+  
+    </div>
+  
+    
+    <div class="section">
+      <div class="section-header"><span class="section-icon">c</span><h2>Per-Challenge Rollup</h2></div>
+      
+    <details class="collapsible">
+      <summary>1 - DrillBabyDrill (0/6 solved)</summary>
+      <div class="collapsible-body">
+        <p class="muted">0 of 6 runs solved this challenge.</p>
+        
+    <div class="table-wrapper">
+      <table >
+        <thead>
+          <tr>
+            <th data-sortable="true">Variant</th><th data-sortable="true">Run</th><th data-sortable="true">Solved</th><th data-sortable="true">Flag</th><th data-sortable="true">Duration</th><th data-sortable="true">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>ollama:qwen2.5-coder:7b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>334.345s</td><td>$0.0000</td></tr><tr><td>ollama:llama3.1:8b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>901.862s</td><td>$0.0000</td></tr><tr><td>ollama:qwen3.5:4b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>98.724s</td><td>$0.0000</td></tr><tr><td>ollama:gemma3:4b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>92.310s</td><td>$0.0000</td></tr><tr><td>ollama:phi4-mini+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td><span class="mono">FLAG{...}</span></td><td>234.657s</td><td>$0.0000</td></tr><tr><td>ollama:hf.co/squ11z1/Mythos-nano:F16+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>610.215s</td><td>$0.0000</td></tr>
+        </tbody>
+      </table>
+    </div>
+  
+      </div>
+    </details>
+  
+    <details class="collapsible">
+      <summary>2 - project_chimera (0/6 solved)</summary>
+      <div class="collapsible-body">
+        <p class="muted">0 of 6 runs solved this challenge.</p>
+        
+    <div class="table-wrapper">
+      <table >
+        <thead>
+          <tr>
+            <th data-sortable="true">Variant</th><th data-sortable="true">Run</th><th data-sortable="true">Solved</th><th data-sortable="true">Flag</th><th data-sortable="true">Duration</th><th data-sortable="true">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>ollama:qwen2.5-coder:7b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>796.159s</td><td>$0.0000</td></tr><tr><td>ollama:llama3.1:8b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>652.668s</td><td>$0.0000</td></tr><tr><td>ollama:qwen3.5:4b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>353.826s</td><td>$0.0000</td></tr><tr><td>ollama:gemma3:4b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>32.872s</td><td>$0.0000</td></tr><tr><td>ollama:phi4-mini+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>55.488s</td><td>$0.0000</td></tr><tr><td>ollama:hf.co/squ11z1/Mythos-nano:F16+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>609.563s</td><td>$0.0000</td></tr>
+        </tbody>
+      </table>
+    </div>
+  
+      </div>
+    </details>
+  
+    <details class="collapsible">
+      <summary>3 - pretty_devilish_file (0/6 solved)</summary>
+      <div class="collapsible-body">
+        <p class="muted">0 of 6 runs solved this challenge.</p>
+        
+    <div class="table-wrapper">
+      <table >
+        <thead>
+          <tr>
+            <th data-sortable="true">Variant</th><th data-sortable="true">Run</th><th data-sortable="true">Solved</th><th data-sortable="true">Flag</th><th data-sortable="true">Duration</th><th data-sortable="true">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>ollama:qwen2.5-coder:7b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>759.196s</td><td>$0.0000</td></tr><tr><td>ollama:llama3.1:8b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>178.846s</td><td>$0.0000</td></tr><tr><td>ollama:qwen3.5:4b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>271.188s</td><td>$0.0000</td></tr><tr><td>ollama:gemma3:4b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>82.605s</td><td>$0.0000</td></tr><tr><td>ollama:phi4-mini+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>162.159s</td><td>$0.0000</td></tr><tr><td>ollama:hf.co/squ11z1/Mythos-nano:F16+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>609.723s</td><td>$0.0000</td></tr>
+        </tbody>
+      </table>
+    </div>
+  
+      </div>
+    </details>
+  
+    <details class="collapsible">
+      <summary>4 - UnholyDragon (0/6 solved)</summary>
+      <div class="collapsible-body">
+        <p class="muted">0 of 6 runs solved this challenge.</p>
+        
+    <div class="table-wrapper">
+      <table >
+        <thead>
+          <tr>
+            <th data-sortable="true">Variant</th><th data-sortable="true">Run</th><th data-sortable="true">Solved</th><th data-sortable="true">Flag</th><th data-sortable="true">Duration</th><th data-sortable="true">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>ollama:qwen2.5-coder:7b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>260.238s</td><td>$0.0000</td></tr><tr><td>ollama:llama3.1:8b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>282.510s</td><td>$0.0000</td></tr><tr><td>ollama:qwen3.5:4b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td><span class="mono">flag{...}</span></td><td>225.897s</td><td>$0.0000</td></tr><tr><td>ollama:gemma3:4b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>41.434s</td><td>$0.0000</td></tr><tr><td>ollama:phi4-mini+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>118.127s</td><td>$0.0000</td></tr><tr><td>ollama:hf.co/squ11z1/Mythos-nano:F16+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>609.418s</td><td>$0.0000</td></tr>
+        </tbody>
+      </table>
+    </div>
+  
+      </div>
+    </details>
+  
+    <details class="collapsible">
+      <summary>5 - ntfsm (0/6 solved)</summary>
+      <div class="collapsible-body">
+        <p class="muted">0 of 6 runs solved this challenge.</p>
+        
+    <div class="table-wrapper">
+      <table >
+        <thead>
+          <tr>
+            <th data-sortable="true">Variant</th><th data-sortable="true">Run</th><th data-sortable="true">Solved</th><th data-sortable="true">Flag</th><th data-sortable="true">Duration</th><th data-sortable="true">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>ollama:qwen2.5-coder:7b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>1802.949s</td><td>$0.0000</td></tr><tr><td>ollama:llama3.1:8b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>306.231s</td><td>$0.0000</td></tr><tr><td>ollama:qwen3.5:4b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>254.555s</td><td>$0.0000</td></tr><tr><td>ollama:gemma3:4b+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>38.005s</td><td>$0.0000</td></tr><tr><td>ollama:phi4-mini+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>113.933s</td><td>$0.0000</td></tr><tr><td>ollama:hf.co/squ11z1/Mythos-nano:F16+arael</td><td>0</td><td><span class="badge badge-danger">no</span></td><td></td><td>611.589s</td><td>$0.0000</td></tr>
+        </tbody>
+      </table>
+    </div>
+  
+      </div>
+    </details>
+  
+    </div>
+  
+    
+    <div class="section">
+      <div class="section-header"><span class="section-icon">i</span><h2>Run Environment</h2></div>
+      
+    <details class="collapsible">
+      <summary>Reproducibility metadata</summary>
+      <div class="collapsible-body">
+    <div class="table-wrapper">
+      <table >
+        <thead>
+          <tr>
+            <th>Field</th><th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Generated</td><td><span class="mono">2026-06-28T08:42:12.086Z</span></td></tr><tr><td>Arael version</td><td><span class="mono">3.0.3</span></td></tr><tr><td>Git commit</td><td><span class="mono">5efe2e1</span></td></tr><tr><td>Node</td><td><span class="mono">v22.16.0</span></td></tr><tr><td>Platform</td><td><span class="mono">win32 x64 (Windows_NT 10.0.19045)</span></td></tr><tr><td>CPUs / Memory</td><td><span class="mono">16 cores / 13328 MB</span></td></tr><tr><td>Working dir</td><td><span class="mono">C:\Users\raul\Documents\GitHub\Arael</span></td></tr><tr><td>Agents</td><td><span class="mono">ollama:qwen2.5-coder:7b+arael, ollama:llama3.1:8b+arael, ollama:qwen3.5:4b+arael, ollama:gemma3:4b+arael, ollama:phi4-mini+arael, ollama:hf.co/squ11z1/Mythos-nano:F16+arael</span></td></tr><tr><td>Runs / Concurrency</td><td><span class="mono">1 / 1</span></td></tr><tr><td>Timeout</td><td><span class="mono">1800s</span></td></tr><tr><td>Ollama URL</td><td><span class="mono">http://localhost:11434</span></td></tr><tr><td>Prompt source</td><td><span class="mono">bench-prompt-noweb.txt</span></td></tr><tr><td>Prompt sha256</td><td><span class="mono">485867b7c866ca0876854cab6cc35a62606d3283a24a467cdbcff5464e87addc</span></td></tr><tr><td>Pricing file</td><td><span class="mono">—</span></td></tr><tr><td>Pricing sha256</td><td><span class="mono">—</span></td></tr><tr><td>Ground truth file</td><td><span class="mono">flare-flags.json</span></td></tr><tr><td>Ground truth sha256</td><td><span class="mono">c8d645c2856539b482a9649d078d89bc0947a3fc3e4800ba7c26ea4df76039c1</span></td></tr><tr><td>GHIDRA_PATH</td><td><span class="mono">C:\Users\raul\Documents\GitHub\Arael\ghidra-master\ghidra_12.0_PUBLIC</span></td></tr><tr><td>ARAEL_PYTHON</td><td><span class="mono">C:\Python313\python.exe</span></td></tr><tr><td>Arael server</td><td><span class="mono">C:\Users\raul\Documents\GitHub\Arael\dist\mcp\server.js</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+    </details>
+  
+    </div>
+  
+  </div>
+  <footer>
+    <p>Generated by <a href="https://github.com/raulradulescu/arael">Arael</a> - Reverse Engineering Assistant</p>
+    <p class="footer-meta">Timestamp: 2026-06-28T08:42:12.086Z</p>
+  </footer>
+  <script>
+
+    (function () {
+      function textFor(row) {
+        return row.textContent.toLowerCase();
+      }
+      function applyFilters(tableId) {
+        var target = document.getElementById(tableId);
+        if (!target) return;
+        var searchInputs = document.querySelectorAll('[data-search-target="' + tableId + '"]');
+        var solvedToggles = document.querySelectorAll('[data-solved-toggle="' + tableId + '"]');
+        var query = '';
+        searchInputs.forEach(function (input) {
+          query += ' ' + String(input.value || '').toLowerCase();
+        });
+        query = query.trim();
+        var solvedOnly = false;
+        solvedToggles.forEach(function (toggle) {
+          solvedOnly = solvedOnly || toggle.checked;
+        });
+        if (target.tagName && target.tagName.toLowerCase() === 'table') {
+          target.querySelectorAll('tbody tr').forEach(function (row) {
+            var matchesQuery = !query || textFor(row).indexOf(query) !== -1;
+            var matchesSolved = !solvedOnly || row.getAttribute('data-solved') === 'true';
+            row.style.display = matchesQuery && matchesSolved ? '' : 'none';
+          });
+        } else {
+          target.querySelectorAll('[data-search-item]').forEach(function (item) {
+            var itemText = String(item.getAttribute('data-search-text') || item.textContent || '').toLowerCase();
+            item.style.display = !query || itemText.indexOf(query) !== -1 ? '' : 'none';
+          });
+        }
+      }
+      document.querySelectorAll('[data-search-target]').forEach(function (input) {
+        input.addEventListener('input', function () {
+          applyFilters(input.getAttribute('data-search-target'));
+        });
+      });
+      document.querySelectorAll('[data-solved-toggle]').forEach(function (input) {
+        input.addEventListener('change', function () {
+          applyFilters(input.getAttribute('data-solved-toggle'));
+        });
+      });
+      document.querySelectorAll('th[data-sortable="true"]').forEach(function (th) {
+        th.addEventListener('click', function () {
+          var table = th.closest('table');
+          if (!table || !table.tBodies.length) return;
+          var index = Array.prototype.indexOf.call(th.parentNode.children, th);
+          var direction = th.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
+          th.parentNode.querySelectorAll('th').forEach(function (other) {
+            other.removeAttribute('data-sort-dir');
+          });
+          th.setAttribute('data-sort-dir', direction);
+          var rows = Array.from(table.tBodies[0].rows);
+          rows.sort(function (left, right) {
+            var leftText = (left.cells[index] && left.cells[index].getAttribute('data-sort-value')) || (left.cells[index] && left.cells[index].textContent) || '';
+            var rightText = (right.cells[index] && right.cells[index].getAttribute('data-sort-value')) || (right.cells[index] && right.cells[index].textContent) || '';
+            var leftNum = Number(String(leftText).replace(/[^0-9.+-]/g, ''));
+            var rightNum = Number(String(rightText).replace(/[^0-9.+-]/g, ''));
+            var result = Number.isFinite(leftNum) && Number.isFinite(rightNum)
+              ? leftNum - rightNum
+              : String(leftText).localeCompare(String(rightText), undefined, { numeric: true, sensitivity: 'base' });
+            return direction === 'asc' ? result : -result;
+          });
+          rows.forEach(function (row) {
+            table.tBodies[0].appendChild(row);
+          });
+        });
+      });
+      document.querySelectorAll('[data-copy]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var text = button.getAttribute('data-copy') || '';
+          var done = function () {
+            var previous = button.textContent;
+            button.textContent = 'Copied';
+            setTimeout(function () { button.textContent = previous; }, 1000);
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done).catch(function () {});
+          } else {
+            var area = document.createElement('textarea');
+            area.value = text;
+            document.body.appendChild(area);
+            area.select();
+            try { document.execCommand('copy'); done(); } catch (error) {}
+            document.body.removeChild(area);
+          }
+        });
+      });
+    }());
+  
+  </script>
+</body>
+</html>
