@@ -33,17 +33,19 @@ describe('agent benchmark', () => {
       { engine: 'antigravity', model: 'some-model', araelMcp: false }
     ]);
 
-    // `agy:` is an alias for the antigravity engine, and antigravity is always bare
-    // (a trailing +arael is ignored since its MCP config is global, not per-run).
+    // `agy:` is an alias for the antigravity engine. A trailing +arael sets the
+    // araelMcp flag like any other engine; antigravity just wires the server through
+    // its global MCP config rather than a per-run flag.
     expect(parseAgentSpecs('agy:Gemini 3.5 Flash (Pro),agy:some-model+arael')).toEqual([
       { engine: 'antigravity', model: 'Gemini 3.5 Flash (Pro)', araelMcp: false },
-      { engine: 'antigravity', model: 'some-model', araelMcp: false }
+      { engine: 'antigravity', model: 'some-model', araelMcp: true }
     ]);
 
-    // Local model tags carry a colon (e.g. qwen3.5:4b) and never attach MCP.
+    // Local model tags carry a colon (e.g. qwen3.5:4b). A trailing +arael still sets
+    // the flag: ollama+arael drives an agentic tool loop with the Arael MCP attached.
     expect(parseAgentSpecs('ollama:qwen3.5:4b,ollama:mythos-nano+arael')).toEqual([
       { engine: 'ollama', model: 'qwen3.5:4b', araelMcp: false },
-      { engine: 'ollama', model: 'mythos-nano', araelMcp: false }
+      { engine: 'ollama', model: 'mythos-nano', araelMcp: true }
     ]);
   });
 

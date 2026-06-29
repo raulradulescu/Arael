@@ -60,12 +60,12 @@ ghidra-master/
 *.pyc
 __pycache__/
 
-# Windows system file to avoid accidental commits of this file which can cause problems on other systems
+# Windows system files
 Thumbs.db
 nul
 
 
-# macOS system file to avoid accidental commits of this file which can cause problems on other systems
+# macOS system files
 .DS_Store
 
 # Test folders
@@ -95,6 +95,18 @@ Arael-licenta-Raul.pdf
 # GSD workflow scaffolding (internal planning state, not product code)
 .planning/
 
-# Agent config (interactive slash-command prompts and agent guides)
-.claude/commands/
+# Agent guide (kept off the repo; .claude/commands stays tracked as a product feature)
 AGENTS.md
+
+# Root PRDs stay out of the repo
+/PRD_*.md
+
+# docs/: ignore everything, then re-allow only the public docs we ship.
+docs/*
+!docs/INSTALLATION.md
+!docs/TROUBLESHOOTING.md
+!docs/LOCAL_LLM_PROMPT.md
+!docs/LOCAL_LLM_PROMPT.xml
+!docs/bachelor-benchmark-all-trials.csv
+!docs/bachelor-benchmark-summary.csv
+!docs/benchmark/

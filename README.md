@@ -2,8 +2,8 @@
 
 **A reverse-engineering assistant built on Ghidra and PyGhidra**
 
-[![Version](https://img.shields.io/badge/version-3.0.3-blue)]()
-[![Tests](https://img.shields.io/badge/tests-271%20passing-brightgreen)]()
+[![Version](https://img.shields.io/badge/version-3.0.4-blue)]()
+[![Tests](https://img.shields.io/badge/tests-288%20(183%20unit%20%2B%20105%20integration)-brightgreen)]()
 [![Ghidra](https://img.shields.io/badge/Ghidra-12.0%2B-blue)]()
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)]()
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-blue)]()
@@ -77,7 +77,6 @@ Set `GHIDRA_PATH` and `ARAEL_PYTHON` either in a repo-local `.env` (loaded from 
 # Windows
 GHIDRA_PATH=C:\Tools\ghidra_<version>_PUBLIC
 ARAEL_PYTHON=C:\Tools\Arael\.venv\Scripts\python.exe
-GHIDRA_VERSION=<version>
 
 # Linux / macOS
 GHIDRA_PATH=/opt/ghidra_<version>_PUBLIC
@@ -92,7 +91,6 @@ A single `.env` can hold defaults plus `# WSL` and `# Windows` sections; later p
 |---|---|---|
 | `GHIDRA_PATH` | Extracted Ghidra root | Required (headless) |
 | `ARAEL_PYTHON` | Python containing PyGhidra | `python` / `python3` |
-| `GHIDRA_VERSION` | Version recorded in cache metadata | `unknown` |
 | `GHIDRA_BRIDGE_HOST` / `_PORT` | Optional bridge endpoint | `127.0.0.1` / `4768` |
 | `ARAEL_USE_SYSTEM_STRINGS` | `1` to prefer system `strings` | Unset |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` (or `GEMINI_API_KEY`) | Enable `ask` providers | Unset |
@@ -170,7 +168,7 @@ arael benchmark-agents ./challenges \
   --format html --output ./.arael/benchmark-results/agents.html
 ```
 
-Artifacts (manifest, stdout, stderr, run records) are written under `<report>.artifacts/`. Ollama runs are local prompt-based baselines.
+Artifacts (manifest, stdout, stderr, run records) are written under `<report>.artifacts/`. Ollama runs are local prompt-based baselines. For the methodology and sample reports from real FLARE-On runs, see [docs/benchmark/](docs/benchmark/README.md).
 
 ## MCP setup
 
@@ -231,12 +229,17 @@ npm run lint
 npm test                 # npm run test:unit | test:integration | test:coverage
 ```
 
-Integration tests require a working Ghidra/PyGhidra setup; unit tests usually do not. Source is organized under `src/` (`analysis`, `benchmark`, `cache`, `cli`, `ghidra`, `llm`, `mcp`, `output`, `utils`) with tests under `tests/`. See also [Installation notes](docs/INSTALLATION.md) and [Local LLM integration](docs/LOCAL_LLM_PROMPT.md).
+The suite has 288 tests (183 unit, 105 integration). Integration tests require a working Ghidra/PyGhidra setup; unit tests usually do not. Source is organized under `src/` (`analysis`, `benchmark`, `cache`, `cli`, `ghidra`, `llm`, `mcp`, `output`, `utils`) with tests under `tests/`. See also [Installation notes](docs/INSTALLATION.md) and [Local LLM integration](docs/LOCAL_LLM_PROMPT.md).
 
 ## Acknowledgments
 
+My thanks to **Lect. Dr. Cristian Cira** for the detailed and continued feedback that shaped both the direction and the quality of this work, and to **Fineas Silaghi** for his technical help and for patiently working through the hard questions about where to take the project.
+
+Tools and data this project builds on:
+
 - [Ghidra](https://github.com/NationalSecurityAgency/ghidra) by the National Security Agency
 - [PyGhidra](https://pypi.org/project/pyghidra/) · [MITRE ATT&CK](https://attack.mitre.org/) · [ReversingLabs YARA rules](https://github.com/reversinglabs/reversinglabs-yara-rules)
+- [FLARE-On challenges](https://flare-on.com/) by Mandiant (Google Cloud), used as the agent-benchmark corpus
 
 ## License
 
